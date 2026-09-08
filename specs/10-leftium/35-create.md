@@ -9,24 +9,24 @@
 ```text
 resolve destination, creator/template, options and versions
   -> resolve add-ons, presets, inputs and dependencies
-  -> finalize and report plan
+  -> report intended operations and known choices
   -> scaffold base project
   -> inspect actual capabilities and reconcile add-ons
   -> install dependencies
   -> verify and record recipe
 ```
 
-Resolve all knowable choices before significant mutation. Creation-time capability predictions are provisional until the generated project can be inspected. Apply the same preservation, conflict, dependency-ordering, and idempotency rules as `le add`; do not build a second transform system.
+Resolve practical choices and known conflicts before significant mutation; a complete pre-mutation file diff is not required. Inspect the generated project before dependent transforms. Creation-time capability predictions are provisional until that inspection; upstream operations retain their own supported checks and reporting. Apply the same preservation, conflict, dependency-ordering, and idempotency rules as `le add`; do not build a second transform system.
 
-Prefer one final dependency installation when the creator and add-ons support deferral. Record unavoidable earlier installs in the plan. Preserve package-manager selection and lockfile behavior from the CLI spec. A supported no-install path should report skipped install-dependent verification and the command needed to finish setup.
+Follow the shared [installation and execution result contract](20-architecture.md#installation-and-execution-results): coordinate one final install where supported, honor `--no-install`, preserve workspace lockfile ownership, and report upstream exceptions and skipped checks.
 
 Use a missing or empty destination. Refuse a nonempty destination, including `.`, before scaffolding; `add` is the supported path for existing projects. Do not overwrite unrelated files or promise atomic rollback across external tools. On failure, stop dependent work, report completed steps and remaining files, and provide recovery instructions. Never recursively delete a destination as implicit cleanup. A failed run must not emit a successful-creation claim.
 
-These destination and failure rules are v2 design choices that keep initial creation reviewable without requiring a transaction framework.
+Git is optional. Leave Git initialization to the selected creator and report its behavior; Leftium does not independently initialize a repository or make an automatic commit. Version control supports review and recovery when a baseline exists, but newly generated files may not be recoverable through Git. Report partial output and effects outside tracked files using the shared review policy.
 
 ## Inputs and interaction
 
-Interactive selection and command-line arguments resolve into the same internal plan. The prompt sequence follows creator, template, creator-specific options, add-ons and their required choices, then installation choices. Explicit inputs avoid prompts; missing inputs in non-interactive mode fail with instructions.
+Interactive selection and command-line arguments resolve into one structured internal creation request. Keep argument arrays internally; a shell-specific renderer owns command quoting. The request feeds execution and recipe serialization. The prompt sequence follows creator, template, creator-specific options, add-ons and their required choices, then installation choices. Explicit inputs avoid prompts; missing inputs in non-interactive mode fail with instructions.
 
 Working command shape:
 
@@ -49,9 +49,11 @@ The primary human-readable recipe is an executable, non-interactive `leftium cre
 
 The serializer must quote arguments safely and round-trip supported values. Do not record only a mutable shorthand such as `--preset leftium-kit`. Do not embed authentication credentials in a README; if an input requires private access, document the prerequisite separately.
 
-The preferred location is a clearly identified section in the generated README, preserving upstream instructions and unrelated content. Define section ownership and collision behavior before implementing insertion; replace only an unambiguously owned recipe section. Keep the recipe as original-creation history when later `add` operations run.
+The preferred location is a clearly identified section in the generated README, preserving upstream instructions and unrelated content. Mark the recipe section as generated; replacement, when explicitly requested by a recipe-writing operation, is limited to that section. Preserve an unmarked existing section or report a collision rather than adopting it silently. Keep the recipe as original-creation history when later `add` operations run.
 
-A recipe is not a lockfile, backup, or promise of byte-identical dependencies. Identify mutable or unpinnable upstream inputs and state the resulting reproducibility limit. Capture actual resolved inputs rather than inventing version guarantees. A separate machine-readable recipe is deferred until a consumer needs it.
+Replay targets a fresh destination and reproduces supported initial creation choices. It does not reconstruct subsequent edits or describe the current project after later setup. Existing-project add-ons inspect current files and apply their documented reconciliation rules independently of the original recipe. Do not track every subsequent operation or merge updated templates as part of this contract.
+
+A recipe is not a lockfile, backup, or promise of byte-identical files or dependencies. Identify mutable or unpinnable upstream inputs and state the resulting reproducibility limit. Capture actual resolved inputs rather than inventing version guarantees. A separate machine-readable recipe is deferred until a consumer needs it.
 
 For a preset whose content is not fixed by the pinned Leftium release, record immutable source identity or expand the effective values into the recipe. A local filename or mutable preset name alone is insufficient. If an upstream add-on cannot expose enough input for replay, identify that limitation rather than claim complete reproduction. The initial creation milestone may reject such inputs before scaffolding instead of adding remote-source machinery.
 
@@ -73,7 +75,8 @@ API signatures, exact flags, and README markers are implementation decisions at 
 - Unknown inputs and nonempty destinations fail before avoidable mutation; later failures identify partial work accurately.
 - Installation happens once when every selected operation supports deferral; exceptions are visible.
 - The generated recipe runs without prompts in a fresh destination and reproduces the supported creation choices independently of changed user defaults.
-- README content survives recipe insertion, and argument quoting preserves supported values.
+- README content survives recipe insertion, and argument quoting preserves supported values. Later add-on operations leave the original recipe unchanged.
+- Replay fixtures compare supported choices and meaningful generated configuration, without requiring identical dependency resolution or machine-specific output.
 - Verification distinguishes successful generation from checks skipped because dependencies were not installed.
 
 ## Later creators and templates

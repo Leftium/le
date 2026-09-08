@@ -49,11 +49,15 @@ le add <addon>
   -> detect the project
   -> resolve the add-on and presets
   -> inspect existing state
-  -> show or apply the required changes
+  -> apply scoped edits or delegate to the upstream tool
   -> verify the result
 ```
 
 An add-on describes a desired result, not an implementation technique. It may use direct transforms, an upstream installer, a generator, shared infrastructure, or another CLI. Leftium should prefer upstream domain models and native configuration formats over parallel abstractions.
+
+Use `sv` as the default for behavior and implementation choices when its approach fits Leftium. Prefer its conventions and public capabilities over inventing alternatives. Depart where Leftium's broader project scope, explicit product requirements, or verified upstream limitations require it; document the reason at that boundary. This is a decision default, not a promise to mirror every upstream feature or release.
+
+Content-specific reconciliation and optional version-control review keep the implementation small. Generated output is replaceable within declared boundaries; shared configuration uses targeted edits. See the [ownership and recovery policy](10-core-model.md#content-ownership-and-reconciliation).
 
 Every v0 add-on must:
 
@@ -61,7 +65,7 @@ Every v0 add-on must:
 - detect conflicts before overwriting user-owned values;
 - be idempotent where the underlying operation permits it;
 - work non-interactively when all required choices are supplied;
-- explain the changes it made or would make.
+- report its changes and any upstream or non-file effects, without promising a complete preview of every operation.
 
 ## Documents
 

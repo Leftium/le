@@ -15,7 +15,7 @@ The v0 default is `mit`. Obtain author and year values from explicit CLI input, 
 
 ## Behavior
 
-Inspect conventional existing license filenames, including `LICENSE` and `LICENSE.md`, before creating a root license file. Do not create a duplicate when an equivalent alternate file exists; multiple inconsistent files are a conflict. Distinguish a missing file, an equivalent license, a different recognizable license, and customized or unrecognized text.
+Inspect conventional existing license filenames, including `LICENSE` and `LICENSE.md`, before creating a license file at the selected package root. In a workspace, report an ancestor license and require an explicit package-level choice before adding a potentially competing license; do not modify the ancestor implicitly. Do not create a duplicate when an equivalent alternate file exists; multiple inconsistent files are a conflict. Distinguish a missing file, an equivalent license, a different recognizable license, and customized or unrecognized text.
 
 Create a missing file and leave an equivalent file unchanged. Do not replace a different or customized license without explicit confirmation or a force option.
 

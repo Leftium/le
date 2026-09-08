@@ -22,7 +22,15 @@ Use qualified template identifiers to resolve collisions. A short name is valid 
 
 ## Project detection
 
-Detection should use repository evidence such as `package.json`, lockfiles, framework configuration, and existing target files. Explicit CLI input wins over inference. Ambiguous or unsupported projects fail before mutation with an explanation of the missing evidence.
+Existing-project commands require a `package.json` at the selected package root. Creation establishes that file through its creator. Git is optional; framework-specific add-ons require additional evidence from native configuration and dependencies. Explicit CLI input wins over inference. Ambiguous or unsupported targets fail before mutation with an actionable explanation.
+
+Use the current package, finding the nearest enclosing `package.json` when invoked below it, or select a package root explicitly with `-C, --cwd`. This follows the upstream [sv targeting interface](https://svelte.dev/docs/cli/sv-add). An explicit target must identify the package root.
+
+Keep an internal project context with the selected package root, containing package-manager workspace root when present, optional Git worktree root, and detection evidence. Detect workspace membership from package-manager configuration, not merely an ancestor lockfile or Git directory. Do not assume `.git` is a directory.
+
+Support one package inside a recognized workspace. App-specific operations at a workspace root require an explicit app selection unless the root itself is the intended compatible app; never pick an arbitrary child. Dependency edits belong to the selected package, while installation respects the workspace and its shared lockfile. Conflicting lockfiles or unsupported workspace layouts require resolution before mutation.
+
+Each add-on defines its file scope. Package configuration stays in the selected package; repository-wide operations use a detected or explicitly supplied repository root. If that root is unavailable, request it or explain the prerequisite instead of guessing. A workspace root is not automatically a Git root. Whole-monorepo creation, bulk package operations, and restructuring shared configuration are deferred.
 
 Detection should expose capabilities instead of assigning one rigid project type:
 
@@ -39,7 +47,7 @@ Detection should expose capabilities instead of assigning one rigid project type
 
 Each add-on declares the capabilities it needs.
 
-Select the package manager from an explicit option, the `packageManager` field, or a recognized lockfile, in that order. Use its native install command and preserve its lockfile.
+Select the package manager from an explicit option, the applicable `packageManager` field (including the containing workspace), or a recognized lockfile, in that order. Validate that selection against the workspace before installation; do not create a competing package lockfile. Use its native install command and preserve its lockfile.
 
 ## Add-on resolution
 
@@ -86,6 +94,14 @@ See [Implementation architecture](20-architecture.md) for the internal boundary.
 
 All supported operations should have a non-interactive path. Missing choices may prompt in a terminal, but automation must be able to provide them as flags or configuration.
 
-Commands must report affected files, package operations, delegated commands, and manual follow-up. Dry-run and structured agent output are [post-v0 work](60-roadmap.md#dry-run-and-agent-support).
+Commands must report changed and newly created files, package operations, delegated commands, local Git-setting changes, and manual follow-up. A concise result summary, supplemented by a version-control diff when available, is the default review experience; displaying a complete diff or asking for approval before every routine edit is not required. Dry-run and structured agent output are [post-v0 work](60-roadmap.md#dry-run-and-agent-support).
 
 Expected errors explain what was attempted, why it failed, and what to do next. Keep normal output concise; reserve stack traces for an explicit diagnostic mode whose flag is still to be chosen. Missing non-interactive inputs fail before mutation when knowable. Preserve upstream failure details and exit status on transparent delegation.
+
+For Git projects, users review tracked changes with `git diff` and `git diff --staged`, and use `git status` to find new files. These may include pre-existing work; do not label the entire repository diff as Leftium's changes. Report the paths affected by the operation rather than adding a change-isolation subsystem. Follow the [review and recovery policy](10-core-model.md#review-and-recovery); do not require a clean tree solely for Leftium-owned edits.
+
+## Installation and completion
+
+Leftium-owned `add` and `create` accept `--no-install`; see the [installation and result contract](20-architecture.md#installation-and-execution-results). Transparent delegation preserves upstream flags and exit behavior.
+
+For Leftium-owned orchestration, exit zero for completed applied/no-op work, including an explicitly requested no-install run whose skipped checks are reported. Unsupported targets, conflicts, cancellation, installation failures, and failed required verification exit nonzero. Exact nonzero codes are an implementation decision; automation must not mistake cancellation or partial completion for success. A skipped check is distinct from a failed check.

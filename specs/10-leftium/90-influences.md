@@ -48,7 +48,7 @@ The rule is consistent: delegate when the upstream workflow is sufficient; compo
 
 ## Creation survey: retained lessons
 
-The [supplied survey](../90-sources/30-creation-tools-survey.md) is design input, not verified current API documentation. Check primary upstream documentation and the selected release when implementing a backend. The newer create addendum takes precedence over the survey's suggested canonical project-preset schema.
+The [supplied survey](../90-sources/30-creation-tools-survey.md) is design input, not verified current API documentation. Check primary upstream documentation and the selected release when implementing a backend. The active [core model](10-core-model.md) supersedes the survey's suggested canonical project-preset schema.
 
 | Research lead | Lesson retained in v2 |
 | --- | --- |

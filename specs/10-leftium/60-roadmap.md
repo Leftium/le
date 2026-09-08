@@ -79,9 +79,9 @@ Deterministic functionality should be extractable when it has consumers outside 
 
 ## Dry-run and agent support
 
-A later automation milestone should add dry runs and machine-readable plans; these are not required for the initial Svelte creation milestone. Likely flags include `--dry-run`, `--json`, `--yes`, and `--diff`.
+The initial review workflow uses concise change reports and version-control diffs when available. A later automation milestone may expose buffered Leftium edits as dry runs or diffs and add machine-readable reports; these are not required for the initial Svelte creation milestone. Likely flags include `--dry-run`, `--json`, `--yes`, and `--diff`.
 
-Agents should be able to determine which files and commands are involved, what supplied each value, and what would change without reverse-engineering terminal prose. A dry run must not write files, install packages, invoke mutating commands, or change remote configuration.
+Agents should be able to determine known file changes, intended commands, and supplied values without reverse-engineering terminal prose. Opaque upstream steps may be reported as unexecuted operations whose exact file effects are unavailable. A dry run must not write files, install packages, invoke mutating commands, or change remote configuration.
 
 ## Open decisions
 
@@ -93,7 +93,7 @@ Agents should be able to determine which files and commands are involved, what s
 - Prettier preset representation.
 - Whether the logo renderer exposes a library API, CLI, or both.
 
-These decisions require implementation evidence and must not delay v0.
+Resolve the internal add-on boundary and built-in defaults during their v0 implementations. The remaining decisions belong to their deferred features and must not delay v0.
 
 ## Project health and lifecycle design
 
@@ -125,4 +125,4 @@ A separate dependency-license review operation was explicitly deferred in the or
 
 Shared agent configuration is an assistant-proposed candidate, not an adopted add-on or directory standard. Determine shared versus project-specific content and merge ownership first.
 
-Other retained brainstorming: removal with protection of user code, an install alias, explicit migration commands, named profiles/generations, richer dependency/conflict metadata, preview conveniences, and rollback. None changes the implementation milestones. Revisit only when a concrete workflow cannot be handled by the existing model.
+Other retained brainstorming: removal with protection of user code, an install alias, explicit migration commands, named profiles/generations, richer dependency/conflict metadata, preview conveniences, and rollback. None changes the implementation milestones. Version control is the recommended recovery mechanism when available; universal ownership tracking, output fingerprints, and three-way template merging are deferred until a concrete workflow requires them.

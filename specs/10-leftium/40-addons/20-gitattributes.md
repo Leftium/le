@@ -19,6 +19,8 @@ The exact default composition is provisional. v0 must include `nodiff` and `eol`
 
 Candidates such as `binary` and `linguist` may be added later. A built-in `leftium` composite may combine the preferred purpose-specific presets rather than duplicate their rules.
 
+The root here is the repository root, detected from Git or explicitly selected as described in [project detection](../30-cli.md#project-detection). Resolve override paths relative to that root. File generation alone does not require Git initialization; a preset needing local Git settings must explain that prerequisite before mutation.
+
 ## Git configuration
 
 The `nodiff` preset must deliver suppressed diff contents, not merely write a driver name. Inspect the relevant Git diff-driver configuration and establish project-local settings where needed. Preserve an existing custom driver or report a conflict; do not change global Git preferences. Determine the exact driver command and supported diff behavior from implementation evidence before shipping this preset.
@@ -35,7 +37,7 @@ A project may add native-format rules in `.leftium/gitattributes.override`. Over
 
 ## File ownership
 
-If `.gitattributes` is absent, Leftium may generate it. If it contains user rules, preserve them and maintain a clearly marked generated block. Equivalent rules must not accumulate.
+Use a clearly marked generated block even in a newly created `.gitattributes`. Preserve existing user rules outside it. The block is replaceable output: direct edits inside it are regenerated without historical edit detection. Its comment must direct custom rules to `.leftium/gitattributes.override` or outside the block. Equivalent rules must not accumulate. Malformed or duplicate markers require an explanation before writing.
 
 Conflicting rules require an explanation. Resolve them only when precedence is deterministic and the result is shown; otherwise stop before writing.
 
@@ -43,4 +45,4 @@ Generated content should name the selected presets and the command that refreshe
 
 ## Verification
 
-Fixture tests must cover leaf presets, composition order, cycles, overrides, existing user content, conflicts, generated-block replacement, and an idempotent second run.
+Fixture tests must cover leaf presets, composition order, cycles, overrides, existing user content, conflicts, replacement of manually edited generated blocks, malformed markers, and an idempotent second run.

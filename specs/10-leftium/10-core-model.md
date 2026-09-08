@@ -23,7 +23,7 @@ An add-on owns the desired result and its validation. It does not require a part
 
 `le add` means "make this add-on's desired result true for the current project." It does not imply that Leftium must own every affected file.
 
-Defining `add` by its result makes repeated use naturally idempotent and avoids separate "install" and "configure" commands for the same capability.
+Defining `add` by its result gives installation and configuration one entry point. Idempotency still requires inspection and reconciliation; it does not follow automatically from the command name.
 
 ## Presets
 
@@ -76,6 +76,30 @@ Before making changes, an add-on must classify relevant state as absent, already
 Leftium should infer current state from the project's native files. It should not copy detected state into `.leftium/` merely to track it.
 
 The project remains the source of truth. Leftium configuration should record desired policy only when that policy cannot be recovered from the native result.
+
+## Content ownership and reconciliation
+
+Choose behavior per file or operation, not once for an entire add-on. One add-on may edit user configuration, regenerate assets, and invoke another tool.
+
+| Content | Behavior |
+| --- | --- |
+| Create-once files, such as `LICENSE` | Create when absent, leave equivalent content alone, and require an explicit choice before replacing different content. |
+| Shared structured configuration | Update relevant keys or syntax nodes; preserve unrelated values and stop on unsupported or ambiguous structures. |
+| Declared generated files or blocks | Regenerate from their inputs, including replacing manual edits inside the declared output boundary. Clearly identify where custom input belongs. |
+| Maintained workflow callers | Preserve documented customization fields and use targeted migrations for interface changes. |
+| Upstream operations | Retain the upstream tool's conflict behavior and report the result and known limitations. |
+
+An existing file is not disposable merely because its path matches a generated output. First adoption must preserve unrelated content or obtain an explicit replacement choice. Once an output boundary is established, regeneration does not require fingerprints, historical output snapshots, or three-way merging. Malformed or ambiguous block boundaries remain an error.
+
+Generated output should identify its inputs and refresh command where practical. Users customize the source configuration or designated override location; manual edits to declared generated output may be replaced on the next run.
+
+## Review and recovery
+
+Git is optional. When version control is available, the recommended workflow is to apply a scoped change, inspect the diff, then keep or undo the desired parts. Without it, scoped edits and change reports still work, but Leftium does not provide backups, transactions, or an automatic rollback engine. Version control does not excuse replacing unrelated configuration.
+
+A clean working tree is useful but is not a general prerequisite for Leftium-owned operations. Preserve the index and unrelated working-tree edits. Leftium does not automatically stage, commit, stash, reset, or restore files. Existing upstream Git checks remain part of delegated behavior.
+
+Report new files and non-file effects as well as tracked edits. Git diff does not show untracked file contents, and Git restore cannot undo package-install side effects, local Git settings, or remote changes. Report those separately without promising automatic recovery. A fresh creation may have no committed baseline; leave partial output inspectable on failure.
 
 ## Overrides
 

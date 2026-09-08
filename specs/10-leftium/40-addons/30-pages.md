@@ -2,6 +2,8 @@
 
 The `pages` add-on configures a compatible static project for deployment to GitHub Pages. SvelteKit is the first required integration, but the design must also support non-Kit projects such as Vite applications.
 
+App configuration belongs to the selected package; the workflow belongs to the repository root. Workspace deployment must use the selected app directory and workspace install context. Require an explicit repository target when it cannot be detected; Git is not required for local file preparation. See [project detection](../30-cli.md#project-detection).
+
 ## Command
 
 ```sh
@@ -12,7 +14,7 @@ The add-on owns project configuration and generated repository files. Enabling P
 
 ## Preconditions
 
-Confirm that the project can be built statically. Required server routes, request-time private environment variables, request-specific headers, server-only cookies, or SSR-only behavior make it incompatible until those dependencies are removed.
+Confirm that production requests can be served from static output. Required request-time server execution, private environment variables, request-specific headers, or server-only cookies make the project incompatible. Server-side code that runs only during prerendering is not by itself a blocker. Inspection establishes likely compatibility; a successful static build and route checks establish the result. See the [SvelteKit static adapter documentation](https://svelte.dev/docs/kit/adapter-static).
 
 A secret used only during CI build or deployment does not require a runtime server.
 
@@ -22,11 +24,11 @@ For a compatible project:
 
 1. For SvelteKit, install and configure `@sveltejs/adapter-static`.
 2. Configure any fallback, trailing-slash, and path behavior required by its framework and routes.
-3. Set a repository base path, or no base path for a custom domain.
+3. Derive the base path from the canonical site URL: `/repository` for a project site under that path, or empty for a custom domain or user/organization root site. Preserve the framework's corresponding development behavior.
 4. Detect the published directory when possible: normally `build/` for SvelteKit and `dist/` for Vite. Ask or require an option when detection is ambiguous.
 5. Create a thin consumer workflow that calls a versioned reusable workflow from the Leftium repository.
 6. Pass only project-specific inputs, such as trigger branch, build commands, package manager, and published directory.
-7. Add `static/CNAME` or the framework-equivalent file only after selecting a canonical custom domain.
+7. Report custom-domain configuration in repository Pages settings as a remote follow-up. Custom Actions deployments ignore `CNAME` files; do not generate one for this workflow. Preserve an existing file unless its migration is explicitly selected. See [GitHub custom-domain configuration](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site).
 8. Report remote GitHub, DNS, URL-reference, and old-host cleanup as follow-up work.
 
 The reusable workflow owns installation, checks, optional tests, building, artifact upload, and deployment. Keeping this logic centralized allows projects to update by changing a pinned workflow reference instead of copying new workflow bodies.
@@ -35,7 +37,9 @@ Generated wrappers should derive tool versions and commands from project metadat
 
 ## Existing configuration
 
-Preserve unrelated Svelte and Vite configuration. If an adapter, base path, workflow, or `CNAME` conflicts, stop and explain rather than silently replacing it.
+Preserve unrelated Svelte and Vite configuration. If an adapter, base path, workflow, or detected domain choice conflicts, stop and explain rather than silently replacing it.
+
+A workflow caller contains supported user customization, so do not regenerate it wholesale merely because Leftium initially created it. Update known fields or perform a targeted caller migration; explain unsupported customization.
 
 Custom-domain aliases require HTTP redirects; multiple DNS aliases must not be treated as multiple Pages custom domains.
 
@@ -47,6 +51,6 @@ Future updates may migrate caller inputs or local configuration as well as chang
 
 ## Verification
 
-Tests must cover SvelteKit and Vite projects, new and existing configuration, incompatible server behavior, unknown output directories, repository and custom-domain paths, routes and assets, workflow-version changes, conflicts, valid deterministic workflow YAML, and an idempotent second run.
+Tests must cover SvelteKit and Vite projects, new and existing configuration, incompatible server behavior, unknown output directories, project-site, user/organization-site, and custom-domain paths, routes and assets, workflow-version changes, conflicts, valid deterministic workflow YAML, and an idempotent second run.
 
 The earlier [migration plan](../../20-github-pages-migration/10-plan.md) contains the project inventory and rollout. Its [workflow template](../../20-github-pages-migration/20-workflow-template.yml) is reference material, not a second source of product requirements.

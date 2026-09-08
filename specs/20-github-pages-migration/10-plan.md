@@ -1,9 +1,11 @@
 # GitHub Pages migration plan
 
 **Date:** 2026-09-07
-**Status:** In progress - YouLoop completed
+**Status:** Recorded as in progress on 2026-09-07; YouLoop completed at that checkpoint
 
 This operational plan predates [Leftium](../10-leftium/00-spec.md). Continue using the checked-in workflow template for current migrations. Once `le add pages` is available, migrate these projects to the add-on and treat the [Pages add-on spec](../10-leftium/40-addons/30-pages.md) as the source of product requirements.
+
+Deployment and inventory observations below are the recorded migration checkpoint, not a fresh fleet audit. Recheck the target repository and host before each rollout or retirement.
 
 ## Pilot status: fx
 
@@ -66,7 +68,7 @@ The scan covered GitHub Actions workflow YAML files under `/Volumes/p`, skipping
 | `LEFTIUM/robots-txt` | `LEFTIUM/robots-txt/.github/workflows/static.yml` | repository root | Static-only deployment. |
 | `nimble.css` | `nimble.css/.github/workflows/pages.yml` | `_site` | Runs its custom build and assembles a site directory first. |
 
-None of the projects in the Vercel CPU screenshot currently has a GitHub Pages workflow. `leftium.github.io` is distinct from `leftium-logo`.
+At the initial scan, none of the projects in the Vercel CPU screenshot had a GitHub Pages workflow. The later `fx` and `youloop` status entries above supersede that initial observation. `leftium.github.io` is distinct from `leftium-logo`.
 
 ## Public URL and custom-domain inventory
 
@@ -99,13 +101,13 @@ Its contact feature has server loads and endpoints, uses private environment val
 
 Use `pH` as the default pattern.
 
-1. Confirm the site has no required server routes, server loads, server actions, private environment variables at request time, request-specific headers, or SSR-only behavior. A GitHub Actions secret may be used to authenticate a build or deployment, but it must not be emitted into the public Pages artifact or be needed after that workflow has finished.
+1. Confirm the site has no required request-time server execution, server actions, private environment variables at request time, or request-specific headers. Prerenderable server loads and endpoints are compatible if their output can be generated at build time. A GitHub Actions secret may be used to authenticate a build or deployment, but it must not be emitted into the public Pages artifact or be needed after that workflow has finished.
 2. Add `@sveltejs/adapter-static` and configure it as the SvelteKit adapter. `pH` is the workflow reference; keep the adapter placement consistent with the SvelteKit version used by the project.
 3. Ensure every route can be prerendered, preferably by enabling prerendering from the root layout so a non-prerenderable route fails the build. Verify the deployed host's route mapping: it may serve an extensionless `/route` from `route.html`, or require `trailingSlash: 'always'` to emit `/route/index.html`. Keep the form used by the generated navigation canonical. Use client-side data loading for data that must stay live after deployment.
-4. Add `.github/workflows/pages.yml` based on `pH/.github/workflows/pages.yml`: install dependencies, run the project's relevant checks/tests, build, upload `build`, then deploy with `actions/deploy-pages`. Keep a manual `workflow_dispatch` trigger, least-privilege Pages permissions, separate build and deploy jobs, and the deploy job's `github-pages` environment URL. Use concurrency deliberately: cancelling superseded Pages runs is appropriate when only the newest commit matters; do not copy Cloudflare's non-cancelling production-deploy policy without a reason. When the workflow uses `pnpm/action-setup`, either declare the intended pnpm version in `package.json` (for example, `"packageManager": "pnpm@11.25.0"`) or pass its `version` input; otherwise setup fails.
+4. Add `.github/workflows/pages.yml` based on `pH/.github/workflows/pages.yml`: install dependencies, run the project's relevant checks/tests, build, upload `build`, then deploy with `actions/deploy-pages`. Keep a manual `workflow_dispatch` trigger, least-privilege Pages permissions, separate build and deploy jobs, and the deploy job's `github-pages` environment URL. Use concurrency deliberately: cancelling superseded Pages runs is appropriate when only the newest commit matters; do not copy Cloudflare's non-cancelling production-deploy policy without a reason. The checked-in template uses `pnpm/setup@v2`, with explicit pnpm/runtime versions and `install: false` before a frozen-lockfile install. Align those inputs with the target project; do not copy them into a project using a different toolchain. See [pnpm setup inputs](https://github.com/pnpm/setup/tree/v2).
 5. Validate the workflow's YAML before committing or pushing. GitHub Actions requires space indentation; tabs create an invalid workflow even if the structure looks right in review. Run the project's formatter and a YAML parser, for example `pnpm exec prettier --check .github/workflows/pages.yml` and `ruby -e "require 'yaml'; YAML.load_file('.github/workflows/pages.yml')"`.
 6. In the GitHub repository's Settings -> Pages, select `GitHub Actions` as the publishing source.
-7. Choose the canonical production URL before building. For a custom domain, configure that one domain in GitHub Pages settings and keep SvelteKit's production base path empty. For a repository-scoped `leftium.github.io/<repository>/` URL, configure the matching SvelteKit base path and verify asset and navigation URLs. A `CNAME` file in the artifact does not by itself configure a Pages custom domain.
+7. Choose the canonical production URL before building. For a custom domain, configure that one domain in GitHub Pages settings and keep SvelteKit's production base path empty. For a repository-scoped `leftium.github.io/<repository>/` URL, configure the matching SvelteKit base path and verify asset and navigation URLs. Custom Actions deployments ignore `CNAME` files; configure the domain in repository Pages settings instead. See [GitHub custom-domain configuration](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site).
 8. If a project has domain aliases, configure only its canonical domain in Pages. Redirect aliases at the DNS provider or edge layer, preserving the path and query string where possible.
 9. Deploy the workflow, check the canonical Pages URL, test deep links and refreshes, then move the custom domain from Vercel only after the Pages version is working.
 
@@ -133,9 +135,9 @@ Do not delete a Vercel project or Cloudflare Worker before the Pages deployment 
 
 ## Completion criteria
 
-- [ ] Each migrated project builds with the static adapter.
+- [ ] Each migrated SvelteKit project builds with the static adapter; other projects produce their native static output.
 - [ ] Each workflow is valid YAML and uses spaces rather than tabs for indentation.
-- [ ] Each workflow deploys its `build` output through GitHub Pages.
+- [ ] Each workflow deploys the project's verified output directory through GitHub Pages.
 - [ ] Root routes, deep links, assets, and client-side interactions work on the Pages URL.
 - [ ] Each project's canonical URL works with the correct base path: domain root for a custom domain or `/repository/` for a repository-scoped Pages URL.
 - [ ] Each canonical custom domain is configured in GitHub Pages, serves from its domain root, and has valid HTTPS before its previous binding is removed.

@@ -18,6 +18,8 @@ Map public assets to native project locations, such as Kit's `static/` or Vite's
 
 Keep reproducible configuration separate from public output and identify which configuration regenerates the assets. Prefer generated assets suitable for committing so deployment does not require the generator; build-time generation remains possible. Leftium should not automatically commit files.
 
+Treat designated generated assets as replaceable output from `LogoConfig`; direct asset edits may be overwritten by regeneration. Establish that output set during installation and require an explicit choice before replacing unrelated pre-existing artwork. A manifest or application head remains shared configuration, even when it references generated assets.
+
 Update icon references and manifest icons without duplicating entries or replacing unrelated head/manifest fields. Preserve application identity; an emoji-derived kit name must not overwrite the app title. Use established project metadata for genuinely needed non-visual fields. Visual reproducibility does not imply byte-identical kit metadata.
 
 ## Design and verification gate
