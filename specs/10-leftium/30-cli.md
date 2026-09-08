@@ -22,15 +22,15 @@ Use qualified template identifiers to resolve collisions. A short name is valid 
 
 ## Project detection
 
-Existing-project commands require a `package.json` at the selected package root. Creation establishes that file through its creator. Git is optional; framework-specific add-ons require additional evidence from native configuration and dependencies. Explicit CLI input wins over inference. Ambiguous or unsupported targets fail before mutation with an actionable explanation.
+A directory is a valid target for generic add-ons such as `license` and `gitattributes`; neither Git nor `package.json` is a universal prerequisite. Package and framework operations declare their own manifest, dependency, and configuration requirements. Explicit CLI input wins over inference. Ambiguous or unsupported targets fail before mutation with an actionable explanation.
 
-Use the current package, finding the nearest enclosing `package.json` when invoked below it, or select a package root explicitly with `-C, --cwd`. This follows the upstream [sv targeting interface](https://svelte.dev/docs/cli/sv-add). An explicit target must identify the package root.
+Use the current directory or an explicit `-C, --cwd` target. For package operations, resolve the nearest enclosing `package.json` from that directory; generic operations do not change targets merely because an ancestor has a manifest. The flag follows the upstream [sv targeting interface](https://svelte.dev/docs/cli/sv-add); provider calls receive the resolved package root.
 
-Keep an internal project context with the selected package root, containing package-manager workspace root when present, optional Git worktree root, and detection evidence. Detect workspace membership from package-manager configuration, not merely an ancestor lockfile or Git directory. Do not assume `.git` is a directory.
+Keep an internal project context with the selected target directory, optional package root, containing package-manager workspace root when present, optional Git worktree root, and detection evidence. Detect workspace membership from package-manager configuration, not merely an ancestor lockfile or Git directory. Do not assume `.git` is a directory.
 
-Support one package inside a recognized workspace. App-specific operations at a workspace root require an explicit app selection unless the root itself is the intended compatible app; never pick an arbitrary child. Dependency edits belong to the selected package, while installation respects the workspace and its shared lockfile. Conflicting lockfiles or unsupported workspace layouts require resolution before mutation.
+Support one package inside a recognized workspace. App-specific operations at a workspace root require an explicit app selection unless the root itself is the intended compatible app; never pick an arbitrary child. Dependency edits belong to the selected package, while installation respects the workspace and its shared lockfile. Conflicting lockfiles or unsupported workspace layouts require resolution before package mutation; unrelated package-manager ambiguity need not block generic file operations.
 
-Each add-on defines its file scope. Package configuration stays in the selected package; repository-wide operations use a detected or explicitly supplied repository root. If that root is unavailable, request it or explain the prerequisite instead of guessing. A workspace root is not automatically a Git root. Whole-monorepo creation, bulk package operations, and restructuring shared configuration are deferred.
+Each add-on defines its file scope. Package configuration stays in the resolved package; repository-wide operations use a detected or explicitly supplied repository root. Without Git, a generic repository-file operation can use the explicitly selected target directory as its root. Do not silently infer a repository root from a workspace root. Report affected roots before applying edits across scopes. Whole-monorepo creation, bulk package operations, and restructuring shared configuration are deferred.
 
 Detection should expose capabilities instead of assigning one rigid project type:
 

@@ -1,6 +1,6 @@
 # Project creation
 
-**Status:** Draft; first milestone after the three-add-on v0.
+**Status:** Draft; internal spike during v0, supported creation in the next milestone.
 
 `le create` uses an upstream creator to establish a project, runs the existing add-on pipeline, and records enough resolved input to recreate that starting point. The first backend is `sv`; additional backends wait until this integration demonstrates the boundary.
 
@@ -60,7 +60,7 @@ For a preset whose content is not fixed by the pinned Leftium release, record im
 ## Implementation gates and sequence
 
 1. Inspect the selected `sv` release for public creation/add APIs, template choices, install control, and version resolution. Establish a compatible dependency and a minimal creation fixture before designing a generic creator interface.
-2. Finalize option scoping and serialization with round-trip examples: a minimal project, multiple official/Leftium add-ons, and a configured add-on requiring non-default values. This is required before calling a recipe complete.
+2. Let three executable round-trip cases determine option scoping and serialization: a minimal project, official Prettier plus Leftium license, and a configured add-on with non-default values. Do not extend the paper grammar before this spike. Validate the structured request, shell renderer, and versioned replay command before calling a recipe complete.
 3. Implement preflight resolution, destination checks, shared add-on execution, and coordinated installation. Report any upstream limitation that prevents a single install or full preflight.
 4. Define README ownership and implement recipe insertion, preserving upstream content.
 5. Verify recreation in a fresh destination and failure behavior before adding other creators.

@@ -4,7 +4,7 @@
 **Status:** Draft v2; implementation has not started
 **Package:** `leftium`
 **Commands:** `leftium`, `le`
-**Repository:** `Leftium/le` (proposed)
+**Repository:** `Leftium/le`
 
 Leftium creates projects through upstream creators, then applies and maintains conventions through the same add-on pipeline used for existing projects.
 
@@ -85,13 +85,15 @@ The separate [GitHub Pages migration plan](../20-github-pages-migration/10-plan.
 
 ## Implementation order
 
-1. Build the CLI shell, project detection, change reporting, and add-on interface.
-2. Implement `license` to establish file creation and conflict handling.
-3. Implement `gitattributes` to establish preset composition and managed-file updates.
-4. Implement `pages` to establish package changes, Svelte configuration, and generated workflows.
-5. Add `sv add` delegation for unknown add-ons in compatible Svelte projects.
+1. Build the CLI shell, directory target context, change reporting, and minimal add-on boundary.
+2. Implement `license` to establish file creation and conflict handling, including plain directories without Git or a package manifest.
+3. Run a vertical creation spike: `sv:minimal`, Leftium `license`, official Prettier, one coordinated install, README recipe, and replay in a fresh destination. Use three representative round-trip cases to settle flags and provider boundaries before freezing the internal API.
+4. Implement `gitattributes`, first comparing native `-diff` with a custom driver in a disposable Git fixture, then establishing preset composition and regeneration.
+5. Harden standalone `sv` delegation and execution-result handling using the spike's findings.
+6. Implement the narrow SvelteKit Pages slice, define and release its reusable workflow, then validate one consumer adoption.
+7. Stabilize creation UX and its supported environment matrix for the next release milestone.
 
-After v0, implement the Svelte creation milestone in [Creation](35-create.md). This order establishes reconciliation before composing it with scaffolding. Do not introduce mines or desired-state configuration to implement either milestone.
+This is engineering order, not release order. The creation spike is internal validation during v0; v0 still ships the three add-ons and delegation, with supported `create` delivery following it. The spike may refine implementation details, but scope changes require an explicit decision. Do not introduce mines or desired-state configuration to implement either milestone.
 
 ## v0 completion
 

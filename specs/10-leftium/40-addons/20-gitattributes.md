@@ -14,7 +14,7 @@ le add gitattributes --preset nodiff --preset eol
 
 The exact default composition is provisional. v0 must include `nodiff` and `eol` as independently selectable presets:
 
-- `nodiff` keeps machine-generated files as normalized text while hiding their contents from ordinary diffs. Initial rules should cover common lockfiles, for example `package-lock.json text eol=lf diff=nodiff`.
+- `nodiff` keeps machine-generated files as normalized text while hiding their contents from ordinary diffs. Initial rules should cover common lockfiles; select the diff attribute through the experiment below.
 - `eol` establishes the project's general text and line-ending policy, normally `* text=auto eol=lf`.
 
 Candidates such as `binary` and `linguist` may be added later. A built-in `leftium` composite may combine the preferred purpose-specific presets rather than duplicate their rules.
@@ -23,9 +23,11 @@ The root here is the repository root, detected from Git or explicitly selected a
 
 ## Git configuration
 
-The `nodiff` preset must deliver suppressed diff contents, not merely write a driver name. Inspect the relevant Git diff-driver configuration and establish project-local settings where needed. Preserve an existing custom driver or report a conflict; do not change global Git preferences. Determine the exact driver command and supported diff behavior from implementation evidence before shipping this preset.
+Before choosing a representation, compare `package-lock.json text eol=lf -diff` with a custom `diff=nodiff` driver in a disposable Git fixture. Inspect ordinary diff output and the intended review tools, text normalization, clone portability, and repeated application.
 
-Verify actual Git diff behavior: generated files remain tracked with the intended text handling, contents are suppressed where promised, existing drivers are respected, and repeat application changes nothing. If local Git configuration cannot be established, report that the preset is incomplete rather than claiming success.
+Prefer native `-diff` if its binary-change summary provides acceptable suppression of textual hunks. Retain a custom driver only for a demonstrated presentation requirement that native attributes cannot meet. Record the observed behavior and selected representation in this spec before shipping; a custom driver is not an architectural requirement.
+
+If a custom driver is selected, establish only project-local Git settings, preserve existing custom drivers or report a conflict, and document setup after cloning. Detect missing Git prerequisites before avoidable mutation. File generation without Git remains possible for presets that do not need local settings. Do not claim complete setup if required settings or verification failed.
 
 ## Presets and overrides
 

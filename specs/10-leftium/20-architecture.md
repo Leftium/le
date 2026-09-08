@@ -38,7 +38,7 @@ resolve options and dependencies
   -> verify and report next steps
 ```
 
-The interface should support `dependsOn`-style dependencies, non-interactive options, and shared mutation utilities. The exact TypeScript API is provisional and should be extracted from the first three implementations rather than designed in isolation.
+The interface should support `dependsOn`-style dependencies, non-interactive options, and shared mutation utilities. The exact TypeScript API is provisional and should emerge from `license` and the early creation/composition spike before the remaining add-ons harden it.
 
 The intended shape is close to `sv`, generalized around detected project capabilities:
 
@@ -57,13 +57,13 @@ defineAddon({
 
 For example, an add-on can require `project.git` or `project.kit` without making the whole add-on system Svelte-specific.
 
-Use realistic fixtures for Node, Vite, Svelte, and SvelteKit projects, with and without Git. Include an empty destination for creation and reject existing-project operations without a package manifest. Shared tests should cover fresh, partial, customized, conflicting, already-current, and repeated application states.
+Use realistic fixtures for plain directories, Git repositories, Node, Vite, Svelte, and SvelteKit projects. Generic add-ons must work without a manifest; package-dependent operations must explain a missing manifest. Include an empty destination for creation. Shared tests should cover fresh, partial, customized, conflicting, already-current, and repeated application states.
 
 Built-in add-ons should use the same eventual shape expected of external mine add-ons where that costs little. v0 does not need dynamic loading, manifests, or a public add-on SDK.
 
 ## Target context
 
-Use the [CLI project context](30-cli.md#project-detection) for every operation. Keep package edits, workspace installation, and repository-wide files scoped to their respective roots. Validate one-package workspace support with fixtures for a standalone package without Git, a workspace member with a shared lockfile, and an ambiguous root invocation rejected before writes. Upstream workspace support must be verified for the selected provider version; do not infer it from Leftium detection alone.
+Use the [CLI project context](30-cli.md#project-detection) for every operation. Keep the target directory distinct from optional package, workspace, and Git roots. Scope edits accordingly and require each capability only for operations that need it. Validate one-package workspace support with fixtures for a standalone package without Git, a workspace member with a shared lockfile, and an ambiguous root invocation rejected before writes. Upstream workspace support must be verified for the selected provider version; do not infer it from Leftium detection alone.
 
 ## Shared editing and reporting
 

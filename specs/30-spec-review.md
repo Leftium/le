@@ -1,13 +1,13 @@
 # Leftium spec review
 
 **Date:** 2026-09-08
-**Status:** Review findings and proposals; R1-R4 and R7 design decisions resolved; serialization and supported-environment details remain implementation gates. Other recommendations remain proposals.
+**Status:** Review findings and proposals; R1-R4, R7, and R9 design decisions resolved. R5 is narrowed to a first SvelteKit slice; its workflow contract remains open. R6 is an accepted experiment with the representation still unselected. R8 and optional structural changes remain proposals.
 **Baseline:** `3cb036e`.
 **Scope:** All documents under `10-leftium/` and the Pages migration plan/template. `90-sources/` is excluded and unchanged.
 
-The product direction is coherent: create an ordinary project through its upstream owner, then reuse add-ons for later setup. Keep that direction and the single-package starting point. The main weakness is that the spec promises more uniform planning, preservation, and replay than its upstream integration boundary currently defines.
+The product direction is coherent: create an ordinary project through its upstream owner, then reuse add-ons for later setup. Keep that direction and the single-package starting point. The review identified overbroad planning and replay guarantees; the accepted contracts below now bound them. Remaining uncertainty belongs primarily to provider integration and Pages delivery.
 
-The recommended next step is a small creation integration spike before freezing the add-on API, followed by a delivery plan that separates release requirements from future ideas. Straightforward corrections and the accepted decisions identified below are applied; other recommendations remain proposals for discussion.
+The accepted next engineering step is a small creation integration spike after `license`, before freezing the add-on API. A separate delivery-plan file remains optional organization work. Straightforward corrections and the accepted decisions identified below are applied; other recommendations remain proposals for discussion.
 
 ## Accepted resolution: content-specific behavior and Git review
 
@@ -19,17 +19,17 @@ The active [core policy](10-leftium/10-core-model.md#content-ownership-and-recon
 
 ## Priority findings
 
-| Priority | Finding | Consequence | Recommendation |
+| Status / priority | Finding | Consequence | Decision or next step |
 | --- | --- | --- | --- |
 | Resolved | R1: Execution guarantees | Complete upstream previews would overcomplicate orchestration | Report known edits and upstream operations; use Git for ordinary review |
 | Resolved | R2: Content ownership | Shared source and generated output need different treatment | Use targeted edits for shared configuration and regeneration for declared output |
 | Resolved | R3: Operation roots and workspace scope | Git is optional; package, workspace, and repository roots may differ | Support one selected package in a recognized workspace; keep operation scopes explicit |
 | Resolved | R4: Initial-creation replay contract | The recipe records starting choices, not subsequent project evolution | Use a structured request and versioned command; settle grammar and verify serialization during implementation |
-| High | R5: Pages combines several unresolved contracts | v0 can stall on deployment infrastructure and unreliable compatibility detection | Separate static setup from workflow delivery and choose a supported mode |
-| Medium | R6: `nodiff` may not need a custom driver | Local Git settings reduce portability and complicate creation | Evaluate native `-diff` before retaining a driver |
+| High | R5: Pages delivery contract | First scope is prerendered SvelteKit; workflow distribution remains a gate | Define and release the narrow reusable workflow before consumer adoption |
+| Experiment | R6: `nodiff` representation | Native attributes may remove local driver setup | Compare native `-diff` and a custom driver in a disposable fixture before selecting |
 | Resolved | R7: Installation and execution results | Partial work and skipped checks must remain visible | Coordinate installation, support no-install, inspect provider results, and stop on failure |
 | Medium | R8: Future lifecycle selection cannot always be inferred | `update` may claim ownership of manually configured tools | Distinguish observed state, managed intent, and provenance |
-| Medium | R9: First-release decisions are mixed with deferrable ones | An implementation agent cannot tell what must be resolved now | Separate delivery gates from the roadmap |
+| Resolved | R9: Engineering sequence | Creation integration needs early evidence | Spike creation after license; preserve v0 release scope and defer optional file reorganization |
 
 ## R1. Make execution guarantees explicit
 
@@ -78,7 +78,7 @@ Git attribute ordering also needs a selected policy. A generated block before us
 
 Affected: [CLI detection](10-leftium/30-cli.md#project-detection), root license/attributes, repository workflows, package installation.
 
-Accepted: existing-project commands use `package.json` as the package baseline, with Git optional. Support one selected package in a recognized workspace; keep package, workspace-install, and optional Git roots separate. App-specific operations must not choose an arbitrary workspace child. Repository-wide operations need a detected or explicit target. Whole-monorepo creation, bulk changes, and restructuring shared configuration remain deferred.
+Accepted, refined by follow-up review: plain directories support generic add-ons. The target directory is always present; package and Git roots are optional capabilities. Package operations require a manifest. Support one selected package in a recognized workspace; keep package, workspace-install, and optional Git roots separate. App-specific operations must not choose an arbitrary workspace child. Repository-wide operations need a detected or explicit target. Whole-monorepo creation, bulk changes, and restructuring shared configuration remain deferred.
 
 The [CLI targeting contract](10-leftium/30-cli.md#project-detection) and [architecture fixtures](10-leftium/20-architecture.md#target-context) define the implementation boundary. Git initialization remains creator-owned; Leftium does not independently initialize or commit. Version-control review is recommended when available, without a replacement rollback system.
 
@@ -108,13 +108,13 @@ Affected: [Pages add-on](10-leftium/40-addons/30-pages.md), [migration plan](20-
 
 The reviewed wording incorrectly required a CNAME artifact for custom Actions deployments and omitted root user/organization sites from base-path selection. Both are corrected. GitHub says custom Actions publishing ignores CNAME files. [GitHub domain configuration](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site).
 
-The remaining design gates are larger:
+The first scope is now fully prerendered SvelteKit, with explicit default-adapter replacement and caller-owned branch triggers. Non-Kit support, SPA fallbacks, and arbitrary migrations are deferred. The remaining delivery gates and rationale are:
 
-1. Choose a default rendering mode. Recommend fully prerendered output first. A client-side fallback can be a separate explicit choice, with host-specific deep-link and HTTP-status behavior documented. Server code that only runs while prerendering is valid; static compatibility cannot be proven from filename detection alone. [SvelteKit static adapter](https://svelte.dev/docs/kit/adapter-static).
-2. Define intentional migration from a recognized default adapter. Treating every existing adapter as an unexplained conflict makes the common newly created SvelteKit project awkward. Show the proposed adapter replacement while preserving other configuration.
+1. Accepted rendering mode: fully prerendered output without a fallback. A later fallback mode needs host-specific deep-link and HTTP-status behavior documented. Server code that only runs while prerendering is valid; static compatibility cannot be proven from filename detection alone. [SvelteKit static adapter](https://svelte.dev/docs/kit/adapter-static).
+2. Accepted migration boundary: offer explicit replacement of a recognized default adapter while preserving unrelated configuration. Verify the recognized adapter shapes against the pinned provider; arbitrary custom migrations remain unsupported.
 3. Specify the reusable workflow's actual `workflow_call` inputs, permissions, secrets, environment, working directory, output, and version reference. The checked-in standalone migration workflow is not that interface. Caller permissions cannot be elevated by a reusable callee. [GitHub reusable workflow constraints](https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations).
-4. Separate trigger branch from callable inputs: the caller owns its `on` trigger. Define which caller choices are also meaningful inputs to the callee.
-5. Distinguish successful local setup from a verified static build and a verified remote deployment. A routine setup command need not run every expensive project check, but skipped verification must be visible.
+4. Accepted ownership: the caller owns its `on` trigger. Define the remaining callable inputs in the reusable-workflow contract.
+5. Accepted reporting boundary: distinguish successful local setup from a verified static build and a verified remote deployment. A routine setup command need not run every expensive project check, but skipped verification must be visible.
 6. Publish an immutable usable workflow revision before generating callers that depend on it. Decide how workflow releases relate to the npm release; this is a distribution prerequisite even without remote mines.
 
 The existing template's action refs resolve upstream, including `pnpm/setup@v2` and its `runtime`, `cache`, and `install` inputs. Do not downgrade them based on older documentation examples. The template grants deployment permissions to the build job as well; reduce that scope when defining the final workflow. Pages deployment requires write/OIDC permissions and an environment on the deploy job. [Pages workflow requirements](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
@@ -131,7 +131,7 @@ package-lock.json text eol=lf -diff
 
 Git separates text normalization from diff presentation. Unsetting `diff` suppresses normal textual hunks and reports a binary difference; it does not hide the file from status or guarantee silence in every diff tool. This avoids a local driver setup dependency. [Git attributes documentation](https://git-scm.com/docs/gitattributes).
 
-Recommend this simpler representation if that presentation meets the user's intent. Retain `diff=nodiff` only if a concrete requirement calls for custom presentation, such as suppressing even the summary. Then specify which Git commands/tools honor it, how collaborators configure it after cloning, and what creation does before Git initialization. No driver change has been applied in this review.
+Recommend this simpler representation if that presentation meets the user's intent. Retain `diff=nodiff` only if a concrete requirement calls for custom presentation, such as suppressing even the summary. Then specify which Git commands/tools honor it, how collaborators configure it after cloning, and what creation does before Git initialization. The active spec now requires the disposable-fixture comparison before choosing a representation; no experiment has been run yet.
 
 ## R7. Define package operations and execution results
 
@@ -155,7 +155,7 @@ Do not add automatic template updating, a registry service, a universal plugin S
 
 ## R9. Improve the implementation order
 
-The current order establishes three add-ons before trying creation. That makes Pages the architectural proving ground while postponing option replay and orchestration, even though creation is now central to the product.
+Accepted: the [overview implementation order](10-leftium/00-spec.md#implementation-order) now brings creation immediately after `license`, while retaining the existing v0 release scope. The sequence below explains the decision; the overview is authoritative for implementation.
 
 Recommended engineering sequence:
 
@@ -168,7 +168,7 @@ Recommended engineering sequence:
 | 5 | Static Pages setup, reusable workflow contract/release, then one real consumer adoption | Framework migration, distribution, deployment behavior |
 | 6 | Stabilize creation UX, documentation, and supported environment matrix | Releasable product behavior |
 
-This need not immediately change release scope: the creation work in step 2 can be an internal spike while v0 still ships the three add-ons. If shipping value sooner matters more than retaining that label, release a small `create`/`add` core first and ship Pages next. I prefer changing the engineering sequence now and deciding the release boundary after the spike.
+The creation work in step 2 is an internal spike. v0 still ships the three add-ons and delegation; supported creation follows. Recipe flags emerge from three executable round-trip cases rather than further paper syntax design.
 
 Before the first release, choose runtime/OS/package-manager support, directory behavior, built-in defaults, conflict handling, and verification policy. Those are delivery gates, not future roadmap ideas. Mines, desired-state commands, fleet scanning, and extra creators can remain deferred.
 
@@ -248,4 +248,4 @@ Applied during this review:
 - Clarified that v0 defaults and the internal interface must be resolved during v0 implementation.
 - Linked the confirmed public `sv` API and made the active model authoritative over source drafts.
 
-Reviewed all active product documents and both migration artifacts. Checked relevant upstream API/source behavior and the template action refs. Local Markdown links/anchors and whitespace checks are the appropriate repository validation for these edits. No project was created, dependency installed, build run, or remote deployment changed. Upstream checks establish feasibility, not a tested supported version matrix. Content ownership, optional-Git review, one-package workspace targeting, and initial-creation replay scope are applied. Installation/result behavior and the `sv` decision default are also applied. Remaining serialization, supported environments, Pages, naming, and implementation-order recommendations are proposals or implementation gates.
+Reviewed all active product documents and both migration artifacts. Checked relevant upstream API/source behavior and the template action refs. Local Markdown links/anchors and whitespace checks are the appropriate repository validation for these edits. No project was created, dependency installed, build run, or remote deployment changed. Upstream checks establish feasibility, not a tested supported version matrix. Content ownership, optional-Git review, one-package workspace targeting, and initial-creation replay scope are applied. Installation/result behavior and the `sv` decision default are also applied. Generic directory targeting, early creation validation, narrowed Pages scope, and an experimental nodiff decision are also applied. Serialization, supported environments, and Pages distribution remain implementation gates; optional file reorganization remains a proposal.
