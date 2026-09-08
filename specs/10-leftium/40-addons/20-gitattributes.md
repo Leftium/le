@@ -19,6 +19,12 @@ The exact default composition is provisional. v0 must include `nodiff` and `eol`
 
 Candidates such as `binary` and `linguist` may be added later. A built-in `leftium` composite may combine the preferred purpose-specific presets rather than duplicate their rules.
 
+## Git configuration
+
+The `nodiff` preset must deliver suppressed diff contents, not merely write a driver name. Inspect the relevant Git diff-driver configuration and establish project-local settings where needed. Preserve an existing custom driver or report a conflict; do not change global Git preferences. Determine the exact driver command and supported diff behavior from implementation evidence before shipping this preset.
+
+Verify actual Git diff behavior: generated files remain tracked with the intended text handling, contents are suppressed where promised, existing drivers are respected, and repeat application changes nothing. If local Git configuration cannot be established, report that the preset is incomplete rather than claiming success.
+
 ## Presets and overrides
 
 Each leaf preset is ordinary `.gitattributes` content. Composite presets are ordered lists of presets. Leftium resolves the list, detects cycles, and concatenates rules deterministically.

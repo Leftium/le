@@ -1,6 +1,19 @@
 # Core model
 
-This document defines the concepts shared by every Leftium add-on.
+This document defines the concepts shared by creation and ongoing setup.
+
+| Concept | Responsibility |
+| --- | --- |
+| Creator | Mechanism that establishes a project, preferably owned by the upstream framework or tool. |
+| Template | Coherent starting structure supplied by a creator, from a minimal skeleton to a substantial application pattern. |
+| Add-on | Capability or convention that can be applied during creation or to an existing project. |
+| Preset | Reusable configuration input; add-on presets use their native domain model. |
+| Recipe | Resolved record of one creation, primarily an executable, versioned `leftium create` command. |
+| Project | Materialized files whose native configuration remains the source of actual state. |
+
+Templates need not decompose into a minimal skeleton plus add-ons. A cohesive multi-window application can remain a template; independently reusable conventions belong in add-ons. Creators may use public APIs, CLIs, upstream catalogs, or Leftium-owned files. Do not copy upstream templates simply to expose them through Leftium.
+
+A recipe records original creation. Future desired-state configuration would record policy to maintain now. Neither replaces native project files. Later `add` operations leave the original recipe unchanged by default; a future explicit recipe-editing workflow would require separate design.
 
 ## Add-ons
 
@@ -29,7 +42,7 @@ A leaf preset contains native add-on configuration. A composite preset contains 
 
 When several presets affect the same value, later presets win unless the add-on defines a safer domain-specific merge. A project override is applied after its presets.
 
-An add-on preset configures one add-on. A future project preset may select and configure several add-ons, but project presets are outside v0.
+An add-on preset configures one add-on. A future named creation preset may expand into template, creator options, and configured add-ons. It is a convenience macro, not the canonical creation record. Record its expanded choices in the recipe. Do not introduce a YAML/JSON project-preset schema just to serialize creation; composite add-on presets remain unchanged.
 
 A bare `le add <addon>` uses the effective default preset when one is configured. Defaults follow the normal scope precedence, so users can replace Leftium's built-in preferences without defining a new add-on.
 

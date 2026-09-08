@@ -15,12 +15,12 @@ The v0 default is `mit`. Obtain author and year values from explicit CLI input, 
 
 ## Behavior
 
-The add-on writes the conventional license file at the repository root. It must distinguish a missing file, an equivalent license, a different recognizable license, and customized or unrecognized text.
+Inspect conventional existing license filenames, including `LICENSE` and `LICENSE.md`, before creating a root license file. Do not create a duplicate when an equivalent alternate file exists; multiple inconsistent files are a conflict. Distinguish a missing file, an equivalent license, a different recognizable license, and customized or unrecognized text.
 
 Create a missing file and leave an equivalent file unchanged. Do not replace a different or customized license without explicit confirmation or a force option.
 
-Package metadata may be updated only when its license field is absent or equivalent. Preserve unrelated metadata. Detailed license-compatibility analysis is outside v0.
+Update package metadata automatically only when its license field is absent or equivalent. Report disagreement between the selected/file license and package metadata; changing a conflicting value requires explicit confirmation or a force option. Preserve unrelated metadata. Detailed license-compatibility analysis is outside v0.
 
 ## Verification
 
-Fixture tests must cover creation, an idempotent second run, explicit and detected metadata, conflicting licenses, customized text, and package metadata preservation.
+Fixture tests must cover creation, an idempotent second run, explicit and detected metadata, conflicting licenses, customized text, alternate filenames, multiple license files, file/metadata disagreement, and package metadata preservation.

@@ -10,6 +10,7 @@ Keep v0 in one package and repository:
 le/
   src/
     cli/
+    creators/       # added for the Svelte creation milestone
     addons/
       license/
       gitattributes/
@@ -64,16 +65,15 @@ Built-in add-ons should use the same eventual shape expected of external mine ad
 
 Use the narrowest integration that preserves upstream ownership:
 
-```text
-unknown compatible Svelte add-on
-  -> spawn sv add
+| Operation | Integration |
+| --- | --- |
+| Svelte creation | Prefer public `sv` creation API. |
+| Official Svelte add-ons during creation or intentional composition | Prefer public `sv` add API and shared utilities where practical. |
+| Transparent unknown/community add-on passthrough | Spawn the real `sv` CLI and retain its resolver, prompts, and exit status. |
 
-Leftium add-on needing sv functionality
-  -> import public sv APIs or sv-utils
-  -> apply Leftium-specific planning or transforms
-```
+Use one known-compatible `sv` dependency for imports and CLI passthrough. Resolve its executable explicitly rather than relying on a global installation or downloading an arbitrary latest version. Upgrading that dependency requires integration fixtures. Verify the selected release's public exports, option shapes, and install-deferral support before implementing creation; source-document API observations are research leads, not a pinned API contract.
 
-Spawning is the default for transparent passthrough because `sv` should own its resolution, prompts, and experimental behavior. Importing is appropriate only for intentional composition. Imported functionality must use a known compatible `sv` version.
+Creation coordinates one interaction, plan, report, and recipe. Reuse the add-on lifecycle after scaffolding, and defer package installation until all supported transforms finish. When an upstream operation requires earlier installation, expose that in the plan rather than replacing its internals. See [Creation](35-create.md) for failure boundaries.
 
 Leftium add-ons do not need to be usable through `sv`. Compatibility flows from `sv` into `le`; the reverse is optional.
 
@@ -88,3 +88,9 @@ The shared lifecycle must allow several implementations:
 - Shared or remote infrastructure, when local deterministic setup is not sufficient.
 
 These are implementation choices inside one add-on model, not separate kinds of user-facing command.
+
+## Transform and orchestration boundaries
+
+Keep deterministic content transforms independently callable where practical. Filesystem access, prompts, package operations, and subprocesses belong to orchestration. This does not require another package, a frozen compatibility layer, or a public SDK.
+
+Test Leftium transforms directly and verify the resulting projects for upstream integrations instead of duplicating upstream unit tests. Delegation fixtures should include official, scoped community, local `file:` and explicit `sv:` requests, plus Svelte projects without Kit, using syntax supported by the pinned runtime.

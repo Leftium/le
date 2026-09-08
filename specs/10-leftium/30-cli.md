@@ -1,6 +1,6 @@
 # CLI
 
-The npm package is `leftium`. It exposes `leftium` as the canonical command and `le` as a short alias. The long name is canonical because the unscoped npm package is available and `npx leftium` is self-explanatory; the natural `le` abbreviation keeps frequent interactive use short. Both commands invoke the same program so their behavior cannot diverge.
+The npm package is `leftium`. It exposes `leftium` as the canonical command and `le` as a short alias. The long name is canonical because `npx leftium` is self-explanatory; the natural `le` abbreviation keeps frequent interactive use short. Both commands invoke the same program so their behavior cannot diverge.
 
 ## v0 command
 
@@ -9,6 +9,16 @@ le add <addon> [options]
 ```
 
 `add` detects the project, resolves the add-on, inspects existing state, plans the change, then applies and verifies it.
+
+## Creation command (next milestone)
+
+```text
+le create [directory] --template <creator>:<template> [--add <addon>]...
+```
+
+The shape is provisional until the [creation option and recipe contract](35-create.md) is finalized. Interactive prompts and explicit arguments must resolve to the same plan. Support `.` only under the same empty-destination checks as any other target. Ask only questions relevant to the selected creator and add-ons.
+
+Use qualified template identifiers to resolve collisions. A short name is valid only when unambiguous or resolved by an explicitly configured default creator; never choose based on catalog order. `<creator>:<template>` is the working syntax, with final grammar settled before shipping creation. Creator-specific channels and versions retain their upstream meanings.
 
 ## Project detection
 
@@ -68,7 +78,7 @@ passthrough  -> spawn the real sv CLI
 composition  -> import public sv APIs or sv-utils when useful
 ```
 
-Passthrough gives `sv` ownership of package resolution, prompts, and community add-on behavior. A Leftium-owned add-on may instead compose with public `sv` functionality when it needs structured planning or additional transforms. In that case, Leftium should depend on a known compatible `sv` version rather than invoke an arbitrary remote version.
+Passthrough gives `sv` ownership of package resolution, prompts, and community add-on behavior. A Leftium-owned add-on may instead compose with public `sv` functionality when it needs structured planning or additional transforms. Both paths use the known-compatible `sv` dependency described in the architecture. Creation prefers public APIs for orchestration; transparent passthrough still uses the CLI.
 
 See [Implementation architecture](20-architecture.md) for the internal boundary.
 
@@ -77,3 +87,5 @@ See [Implementation architecture](20-architecture.md) for the internal boundary.
 All supported operations should have a non-interactive path. Missing choices may prompt in a terminal, but automation must be able to provide them as flags or configuration.
 
 Commands must report affected files, package operations, delegated commands, and manual follow-up. Dry-run and structured agent output are [post-v0 work](60-roadmap.md#dry-run-and-agent-support).
+
+Expected errors explain what was attempted, why it failed, and what to do next. Keep normal output concise; reserve stack traces for an explicit diagnostic mode whose flag is still to be chosen. Missing non-interactive inputs fail before mutation when knowable. Preserve upstream failure details and exit status on transparent delegation.

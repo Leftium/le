@@ -39,6 +39,12 @@ Preserve unrelated Svelte and Vite configuration. If an adapter, base path, work
 
 Custom-domain aliases require HTTP redirects; multiple DNS aliases must not be treated as multiple Pages custom domains.
 
+## Adoption and maintenance documentation
+
+Document the shared workflow for humans and coding agents: adoption and update steps, workflow anatomy, reasons for non-obvious settings, caller versus shared ownership, supported customization, version/change notes, migration instructions, and troubleshooting. Keep caller permissions and project-specific inputs locally inspectable. Generated wrappers should link the owning documentation and explain why they remain thin.
+
+Future updates may migrate caller inputs or local configuration as well as change the workflow reference. Preserve supported branch, build, package-manager, and output choices. Cross-repository version auditing and caller migrations belong to the roadmap; they do not require a separate consumer-version database.
+
 ## Verification
 
 Tests must cover SvelteKit and Vite projects, new and existing configuration, incompatible server behavior, unknown output directories, repository and custom-domain paths, routes and assets, workflow-version changes, conflicts, valid deterministic workflow YAML, and an idempotent second run.
