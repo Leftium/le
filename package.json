@@ -1,6 +1,6 @@
 {
   "name": "leftium",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A project convention CLI for creating projects and applying add-ons.",
   "repository": {
     "type": "git",
