@@ -1,7 +1,12 @@
 import { Command } from 'commander';
+import { readFileSync } from 'node:fs';
 import * as prompts from '@clack/prompts';
 import { runAdd } from '../orchestration/add.js';
 import type { Interaction, LicenseRequest } from '../addons/license/index.js';
+
+const { version } = JSON.parse(
+  readFileSync(new URL('../../../package.json', import.meta.url), 'utf8'),
+) as { version: string };
 
 function terminalInteraction(): Interaction {
   return {
@@ -19,6 +24,8 @@ function terminalInteraction(): Interaction {
 export function createCommand(): Command {
   const program = new Command('leftium')
     .description('Apply project conventions to existing directories.')
+    .version(version)
+    .addHelpText('before', `leftium ${version}\n\n`)
     .action(() => program.outputHelp());
   program.command('add')
     .argument('<addon>', 'add-on to apply (currently license)')

@@ -307,6 +307,20 @@ test('both executable aliases point at the same runnable entry', async () => {
   assert.match(result.stdout, /leftium/);
 });
 
+test('CLI reports the package version through Commander options', async () => {
+  const { version } = JSON.parse(await readFile('package.json', 'utf8')) as { version: string };
+  for (const option of ['--version', '-V']) {
+    const result = spawnSync(process.execPath, [cli, option], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, `${version}\n`);
+  }
+  const help = spawnSync(process.execPath, [cli, '--help'], { encoding: 'utf8' });
+  assert.equal(help.status, 0, help.stderr);
+  assert.ok(help.stdout.includes(`leftium ${version}`));
+  const versionCommand = spawnSync(process.execPath, [cli, 'version'], { encoding: 'utf8' });
+  assert.notEqual(versionCommand.status, 0);
+});
+
 test('invoking the CLI without a command prints help and succeeds', () => {
   const result = spawnSync(process.execPath, [cli], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
