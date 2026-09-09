@@ -1,13 +1,23 @@
 {
   "name": "leftium",
   "version": "0.1.0",
+  "description": "A project convention CLI for creating projects and applying add-ons.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Leftium/le.git"
+  },
+  "homepage": "https://github.com/Leftium/le#readme",
+  "bugs": {
+    "url": "https://github.com/Leftium/le/issues"
+  },
+  "keywords": ["cli", "project", "svelte", "sveltekit", "conventions"],
   "type": "module",
   "engines": {
     "node": ">=24.0.0 <25"
   },
   "packageManager": "pnpm@12.3.4",
   "files": [
-    "dist"
+    "dist/src"
   ],
   "bin": {
     "leftium": "dist/src/cli/index.js",
@@ -28,6 +38,7 @@
     "commander": "15.0.0",
     "jsonc-parser": "3.3.1",
     "minimatch": "10.2.6",
+    "sv": "0.17.0",
     "yaml": "2.9.0"
   },
   "devDependencies": {

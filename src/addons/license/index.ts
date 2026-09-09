@@ -45,6 +45,16 @@ function validYear(year: string): boolean {
   return start! > 0 && end! >= start!;
 }
 
+/** Resolves the inputs required to add a new MIT notice before a creator writes files. */
+export async function resolveNewLicenseRequest(request: LicenseRequest, cwd: string): Promise<Pick<LicenseRequest, 'author' | 'year'>> {
+  const author = request.author ?? await gitValue(cwd, ['config', 'user.name']);
+  const year = request.year ?? String(new Date().getFullYear());
+  if (author === undefined) throw new Stopped('conflict', 'Cannot infer a copyright holder. Supply --author <name>.');
+  if (!validAuthor(author)) throw new Stopped('conflict', 'Supply a nonempty, single-line --author.');
+  if (!validYear(year)) throw new Stopped('conflict', 'Supply --year as YYYY or YYYY-YYYY in ascending order.');
+  return { author: author.trim(), year };
+}
+
 function updateLicenseMetadata(text: string): string {
   const root = parseTree(text)!;
   const existing = root.children?.find(property => property.children?.[0]?.value === 'license');

@@ -1,25 +1,27 @@
 # Leftium
 
-Leftium applies project conventions through add-ons. The first implementation slice supports `le add license` with an MIT preset. Creation and the remaining add-ons are specified but not implemented yet; see the [active spec](specs/10-leftium/00-spec.md).
+Leftium applies project conventions through add-ons. The currently implemented built-in operation is `le add license`, which adds or reconciles an MIT license. Creation and the remaining v0 add-ons are still in progress; see the [active spec](specs/10-leftium/00-spec.md).
 
-Use Node 24 and pnpm 12.3.4 for development:
+Install the published CLI with Node 24:
 
 ```sh
-pnpm install --frozen-lockfile
-pnpm build
-pnpm start add license -C /path/to/project --author "Your Name" --year 2026
+pnpm add -g leftium
+
+le --version
+le --help
+le add license
 ```
 
-The package declares `leftium` and `le` as aliases for the same executable. It remains private during this implementation experiment. `pnpm start` runs that executable directly from this checkout.
+`leftium` and `le` are aliases for the same executable. Use `le add license` in the directory you want to license, or pass `-C /path/to/project`.
 
 The selected directory can be empty and needs neither Git nor `package.json`. An equivalent license is preserved, including an alternate filename. Different or customized content requires interactive confirmation or `--force`; inconsistent multiple license files must be resolved manually. If the selected directory has a `package.json`, only its license field is updated. Ancestor package manifests are not edited.
 
 Useful options:
 
 ```sh
-pnpm start add license -C ./project --non-interactive --author "Your Name"
-pnpm start add license -C ./project --force --author "Your Name" --year 2020-2026
-pnpm start add license -C ./packages/app --package-license --author "Your Name"
+le add license -C ./project --non-interactive --author "Your Name"
+le add license -C ./project --force --author "Your Name" --year 2020-2026
+le add license -C ./packages/app --package-license --author "Your Name"
 ```
 
 Explicit author and year values win. Otherwise, an existing canonical MIT notice supplies them; author inference then tries the target package author and Git's configured name. A new notice defaults to the current year. Missing author input prompts in a terminal and fails in automation. `--package-license` explicitly permits a separate license in a workspace package when an ancestor license exists; `--force` alone does not make that scope choice. This slice recognizes npm/Yarn workspace globs and explicit pnpm workspace package lists.
@@ -27,6 +29,14 @@ Explicit author and year values win. Otherwise, an existing canonical MIT notice
 `--no-install` is accepted; the license operation needs no package installation. Completed applied/no-op requests exit zero. Conflicts, unsupported requests, cancellation, and failures exit nonzero. Failures can leave partial output; the report names affected files. Leftium does not stage or commit changes.
 
 ## Development
+
+Use Node 24 and pnpm 12.3.4:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm build
+pnpm start add license -C /path/to/project --author "Your Name" --year 2026
+```
 
 ```sh
 pnpm test       # compile both languages, then run Node fixture and unit tests

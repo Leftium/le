@@ -124,6 +124,9 @@ importers:
       minimatch:
         specifier: 10.2.6
         version: 10.2.6
+      sv:
+        specifier: 0.17.0
+        version: 0.17.0
       yaml:
         specifier: 2.9.0
         version: 2.9.0
@@ -180,6 +183,9 @@ packages:
     engines: {node: '>=20.11.0'}
     cpu: [x64]
     os: [win32]
+
+  '@sveltejs/sv-utils@0.3.3':
+    resolution: {integrity: sha512-K6Voe+/4Ry6o3QTFdG4cNkdgW9kvbkJuRyyIyUbSVkuJUVz4jCdvYNuDCBNYC1mpxBFi7nuulpOeuqRjldZXRA==}
 
   '@types/node@24.13.3':
     resolution: {integrity: sha512-Dh8vAsV36ig5wa9OX4pXvMc9D3Veibfw2wix0CUwYODLD8nkj9UsLjASr49nPg+2eKzxhBV+v7L8pXvT4e639Q==}
@@ -340,6 +346,10 @@ packages:
   sisteransi@1.0.5:
     resolution: {integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==}
 
+  sv@0.17.0:
+    resolution: {integrity: sha512-bYEZjqq2XSAf6+uE59sXKgGQLS/W8vXrSvuDPeFN7Kit+iDA/LtL8oN/KkldU3pHufSS/R73xaLS4eDrZae62w==}
+    hasBin: true
+
   typescript@7.0.2:
     resolution: {integrity: sha512-8FYau96o3NKOhbjKi/qNvG/W5jhzxkbdm5sj9AbZ/5T5sWqn3hJgLfGx27sRKZWTvyzCP8dLRBTf5tBTSRVUNA==}
     engines: {node: '>=16.20.0'}
@@ -383,6 +393,8 @@ snapshots:
 
   '@rescript/win32-x64@12.3.1':
     optional: true
+
+  '@sveltejs/sv-utils@0.3.3': {}
 
   '@types/node@24.13.3':
     dependencies:
@@ -483,6 +495,10 @@ snapshots:
       '@rescript/win32-x64': 12.3.1
 
   sisteransi@1.0.5: {}
+
+  sv@0.17.0:
+    dependencies:
+      '@sveltejs/sv-utils': 0.3.3
 
   typescript@7.0.2:
     optionalDependencies:
