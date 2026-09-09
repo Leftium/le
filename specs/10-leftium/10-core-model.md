@@ -15,6 +15,10 @@ Templates need not decompose into a minimal skeleton plus add-ons. A cohesive mu
 
 A recipe records original creation. Future desired-state configuration would record policy to maintain now. Neither replaces native project files. Later `add` operations leave the original recipe unchanged by default; a future explicit recipe-editing workflow would require separate design.
 
+Creation provenance must not determine add-on compatibility. `le add` does not require a Leftium recipe or any other evidence that Leftium created the target. Targets created by `le create`, `sv create`, `create-vite`, another framework creator, cloning a Git repository, or manual setup are equivalent add-on targets when the selected add-on's prerequisites are satisfied. This includes plain directories for generic add-ons such as `license` and `gitattributes`.
+
+A recipe is historical creation provenance, not project enrollment or a marker that the project is managed by Leftium. Do not introduce metadata to track Leftium creation as a condition of add-on eligibility.
+
 ## Add-ons
 
 An add-on knows how to add or maintain one capability or convention. Examples include `license`, `gitattributes`, `pages`, `prettier`, and `logo`.

@@ -59,6 +59,8 @@ For example, an add-on can require `project.git` or `project.kit` without making
 
 Use realistic fixtures for plain directories, Git repositories, Node, Vite, Svelte, and SvelteKit projects. Generic add-ons must work without a manifest; package-dependent operations must explain a missing manifest. Include an empty destination for creation. Shared tests should cover fresh, partial, customized, conflicting, already-current, and repeated application states.
 
+Fixture tests must verify that the presence or absence of a Leftium creation recipe does not affect add-on compatibility or reconciliation. At minimum, pair a target created through `le create` with an externally created target having equivalent native state, and apply the same resolved `le add license` and `le add gitattributes` requests. Both targets must receive the same compatibility decisions and resulting managed configuration, including on repeated application. Compare the add-on-managed output, allowing historical recipe content to differ. The external fixtures must work without a Leftium README recipe or `.leftium` metadata; include plain-directory cases without Git or `package.json`.
+
 Built-in add-ons should use the same eventual shape expected of external mine add-ons where that costs little. v0 does not need dynamic loading, manifests, or a public add-on SDK.
 
 ## Target context
