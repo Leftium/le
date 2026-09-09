@@ -17,7 +17,9 @@ function terminalInteraction(): Interaction {
 }
 
 export function createCommand(): Command {
-  const program = new Command('leftium').description('Apply project conventions to existing directories.');
+  const program = new Command('leftium')
+    .description('Apply project conventions to existing directories.')
+    .action(() => program.outputHelp());
   program.command('add')
     .argument('<addon>', 'add-on to apply (currently license)')
     .option('-C, --cwd <dir>', 'target directory')

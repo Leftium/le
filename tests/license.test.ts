@@ -306,3 +306,10 @@ test('both executable aliases point at the same runnable entry', async () => {
   assert.equal(result.status, 0);
   assert.match(result.stdout, /leftium/);
 });
+
+test('invoking the CLI without a command prints help and succeeds', () => {
+  const result = spawnSync(process.execPath, [cli], { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Usage: leftium/);
+  assert.match(result.stdout, /add \[options\] <addon>/);
+});
