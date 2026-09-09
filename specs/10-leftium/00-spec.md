@@ -1,14 +1,14 @@
 # Leftium project orchestrator - spec v2
 
-**Date:** 2026-09-08
-**Status:** Draft v2; license released, Svelte creation spike in progress
+**Date:** 2026-09-09
+**Status:** Draft v2; license and gitattributes released, creation spike validated; supported creation and remaining v0 scope are in progress
 **Package:** `leftium`
 **Commands:** `leftium`, `le`
 **Repository:** `Leftium/le`
 
 Leftium creates projects through upstream creators, then applies and maintains conventions through the same add-on pipeline used for existing projects.
 
-This repository contains the initial CLI and `license` implementation alongside specifications and migration reference material. The target has two entry points: `le create` establishes a starting project and records its creation recipe; `le add` adds or reconciles a capability. Generated projects use ordinary native configuration and should work without Leftium installed. See the [development README](../../README.md) for the currently runnable slice.
+This repository contains the initial CLI, implemented `license` and `gitattributes` add-ons, a validated narrow Svelte creation spike, and specifications and migration reference material. The target has two entry points: `le create` establishes a starting project and records its creation recipe; `le add` adds or reconciles a capability. Generated projects use ordinary native configuration and should work without Leftium installed. See the [development README](../../README.md) for the currently runnable slice. `pages` and transparent delegation of unknown compatible Svelte add-ons remain required v0 work.
 
 This revision supersedes the add-only product framing in place. **Spec v2 is a document revision, not a CLI release number.** The first implementation milestone remains v0; Svelte creation follows immediately. Completion means both milestones below satisfy their observable acceptance criteria.
 

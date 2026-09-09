@@ -1,6 +1,6 @@
 # Leftium
 
-Leftium applies project conventions through add-ons. The currently implemented built-in operation is `le add license`, which adds or reconciles an MIT license. Creation and the remaining v0 add-ons are still in progress; see the [active spec](specs/10-leftium/00-spec.md).
+Leftium applies project conventions through add-ons. The implemented built-ins are `le add license` and `le add gitattributes`. A narrow Svelte creation spike is validated, while supported creation, the Pages add-on, and transparent `sv add` delegation remain in progress; see the [active spec](specs/10-leftium/00-spec.md).
 
 Install the published CLI with Node 24:
 
@@ -10,6 +10,7 @@ pnpm add -g leftium
 le --version
 le --help
 le add license
+le add gitattributes --preset nodiff
 ```
 
 `leftium` and `le` are aliases for the same executable. Use `le add license` in the directory you want to license, or pass `-C /path/to/project`.
