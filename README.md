@@ -50,6 +50,21 @@ pnpm dev:rescript
 pnpm dev:typescript
 ```
 
+### Publishing
+
+Publishing is driven by a `package.json` version change pushed to `main`.
+Choose and create the version locally, then push the version commit:
+
+```sh
+pnpm version patch # or minor, prerelease, or another explicit version
+git push
+```
+
+Before the first automated release, configure `leftium`'s Trusted Publisher in
+npm package settings: GitHub Actions, owner `Leftium`, repository `le`, and
+workflow filename `publish.yml`. Allow direct `npm publish`. This workflow uses
+GitHub Actions OIDC, so no npm token or Git tag push is required.
+
 TypeScript owns discovery, prompts, file edits, and reporting. [License.res](src/addons/license/License.res) owns MIT rendering, state classification, and reconciliation decisions. [runAdd](src/orchestration/add.ts) accepts ordinary requests without Commander, so tests and the CLI share orchestration.
 
 ReScript's [genType integration](https://rescript-lang.org/docs/manual/typescript-integration/) generates the typed import used by TypeScript. Generated `.res.js`, `.gen.tsx`, and `dist/` files are ignored and rebuilt locally. Edit the `.res` source instead of those generated files. The build uses the ReScript compiler and `tsc` directly, without a bundler.
