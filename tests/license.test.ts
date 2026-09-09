@@ -24,6 +24,8 @@ import { runAdd, type AddRequest } from '../src/orchestration/add.js';
 import { discover } from '../src/project/context.js';
 import { applyEdits } from '../src/project/files.js';
 import {
+  nodiffDriverKey,
+  nodiffDriverValue,
   resolvePresets,
   type PresetCatalog,
 } from '../src/addons/gitattributes/index.js';
@@ -349,15 +351,23 @@ test('invalid inputs, presets, and add-ons fail before writes', async (t) => {
 
 test('gitattributes defaults to nodiff, composes ordered presets, and deduplicates requests', async (t) => {
   const root = await fixture(t);
+  git(root, 'init', '-q');
   assert.equal(
     (await runAdd({ addon: 'gitattributes', cwd: root })).status,
     'applied',
   );
   const defaultText = await readFile(join(root, '.gitattributes'), 'utf8');
   assert.match(defaultText, /Selected presets: nodiff/);
-  assert.match(defaultText, /package-lock\.json text eol=lf -diff/);
+  assert.match(defaultText, /package-lock\.json text eol=lf diff=nodiff/);
+  assert.match(defaultText, /bun\.lock text eol=lf diff=nodiff/);
+  assert.match(defaultText, /\*\.lockb binary diff=nodiff/);
+  assert.equal(
+    git(root, 'config', '--local', '--get', nodiffDriverKey).trim(),
+    nodiffDriverValue,
+  );
 
   const composed = await fixture(t);
+  git(composed, 'init', '-q');
   assert.equal(
     (
       await runAdd({
@@ -371,7 +381,7 @@ test('gitattributes defaults to nodiff, composes ordered presets, and deduplicat
   const text = await readFile(join(composed, '.gitattributes'), 'utf8');
   assert.match(text, /Selected presets: nodiff, eol/);
   assert.ok(
-    text.indexOf('package-lock.json') < text.indexOf('* text=auto eol=lf'),
+    text.indexOf('* text=auto !eol') < text.indexOf('package-lock.json'),
   );
   assert.equal((text.match(/package-lock\.json/g) ?? []).length, 1);
   assert.equal(
@@ -384,10 +394,25 @@ test('gitattributes defaults to nodiff, composes ordered presets, and deduplicat
     ).status,
     'no-op',
   );
+
+  const reversed = await fixture(t);
+  git(reversed, 'init', '-q');
+  await runAdd({
+    addon: 'gitattributes',
+    cwd: reversed,
+    preset: ['eol', 'nodiff'],
+  });
+  assert.equal(
+    (await readFile(join(reversed, '.gitattributes'), 'utf8')).split(
+      '# Put custom rules',
+    )[1],
+    text.split('# Put custom rules')[1],
+  );
 });
 
 test('CLI defaults gitattributes to nodiff when no --preset is supplied', async (t) => {
   const root = await fixture(t);
+  git(root, 'init', '-q');
   const result = spawnSync(
     process.execPath,
     [cli, 'add', 'gitattributes', '-C', root, '--non-interactive'],
@@ -396,7 +421,160 @@ test('CLI defaults gitattributes to nodiff when no --preset is supplied', async 
   assert.equal(result.status, 0, result.stderr);
   assert.match(
     await readFile(join(root, '.gitattributes'), 'utf8'),
-    /package-lock\.json text eol=lf -diff/,
+    /package-lock\.json text eol=lf diff=nodiff/,
+  );
+});
+
+test('gitattributes installs and preserves the local nodiff driver safely', async (t) => {
+  const root = await fixture(t);
+  git(root, 'init', '-q');
+  const first = await runAdd({ addon: 'gitattributes', cwd: root });
+  assert.deepEqual(first.effects, [
+    { kind: 'file', path: join(root, '.gitattributes') },
+    { kind: 'git-config', scope: 'local', key: nodiffDriverKey },
+  ]);
+  assert.equal(
+    git(root, 'config', '--local', '--get', nodiffDriverKey).trim(),
+    nodiffDriverValue,
+  );
+  const second = await runAdd({ addon: 'gitattributes', cwd: root });
+  assert.equal(second.status, 'no-op');
+  assert.deepEqual(second.effects, []);
+
+  git(root, 'config', '--local', nodiffDriverKey, 'custom driver');
+  const before = await readFile(join(root, '.gitattributes'), 'utf8');
+  const conflict = await runAdd({ addon: 'gitattributes', cwd: root });
+  assert.equal(conflict.status, 'conflict');
+  assert.match(conflict.message, /Current: custom driver/);
+  assert.equal(await readFile(join(root, '.gitattributes'), 'utf8'), before);
+  assert.equal(
+    git(root, 'config', '--local', '--get', nodiffDriverKey).trim(),
+    'custom driver',
+  );
+
+  git(root, 'config', '--local', '--add', nodiffDriverKey, nodiffDriverValue);
+  const multiple = await runAdd({ addon: 'gitattributes', cwd: root });
+  assert.equal(multiple.status, 'conflict');
+  assert.match(multiple.message, /custom driver.*Desired:/);
+});
+
+test('global nodiff config does not replace repository-local setup', async (t) => {
+  const root = await fixture(t);
+  const global = join(root, 'global.gitconfig');
+  execFileSync('git', [
+    'config',
+    '--file',
+    global,
+    nodiffDriverKey,
+    nodiffDriverValue,
+  ]);
+  git(root, 'init', '-q');
+  const result = spawnSync(
+    process.execPath,
+    [cli, 'add', 'gitattributes', '-C', root, '--non-interactive'],
+    { encoding: 'utf8', env: { ...process.env, GIT_CONFIG_GLOBAL: global } },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(
+    git(root, 'config', '--local', '--get', nodiffDriverKey).trim(),
+    nodiffDriverValue,
+  );
+});
+
+test('nodiff requires Git before file mutation while eol supports plain directories', async (t) => {
+  const root = await fixture(t);
+  const missingRepo = await runAdd({ addon: 'gitattributes', cwd: root });
+  assert.equal(missingRepo.status, 'unsupported');
+  assert.deepEqual(missingRepo.effects, []);
+  await assert.rejects(readFile(join(root, '.gitattributes')), /ENOENT/);
+
+  const eol = await runAdd({
+    addon: 'gitattributes',
+    cwd: root,
+    preset: 'eol',
+  });
+  assert.equal(eol.status, 'applied');
+  assert.match(
+    await readFile(join(root, '.gitattributes'), 'utf8'),
+    /\* text=auto !eol/,
+  );
+});
+
+test('nodiff reports an unavailable Git executable before mutation', async (t) => {
+  const root = await fixture(t);
+  const result = spawnSync(
+    process.execPath,
+    [cli, 'add', 'gitattributes', '-C', root, '--non-interactive'],
+    { encoding: 'utf8', env: { ...process.env, PATH: '' } },
+  );
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /requires an available local Git repository/);
+  await assert.rejects(readFile(join(root, '.gitattributes')), /ENOENT/);
+});
+
+test('nodiff attributes suppress ordinary diff and deterministic difftool content', async (t) => {
+  const root = await fixture(t);
+  const sentinel = join(root, 'difftool-opened');
+  git(root, 'init', '-q');
+  git(root, 'config', 'user.name', 'Test');
+  git(root, 'config', 'user.email', 'test@example.com');
+  await runAdd({
+    addon: 'gitattributes',
+    cwd: root,
+    preset: ['nodiff', 'eol'],
+  });
+  await writeFile(join(root, 'pnpm-lock.yaml'), 'before\n');
+  git(root, 'add', '.');
+  git(root, 'commit', '-qm', 'fixture');
+  await writeFile(join(root, 'pnpm-lock.yaml'), 'after\n');
+
+  assert.match(
+    git(root, 'check-attr', 'diff', 'text', 'eol', '--', 'pnpm-lock.yaml'),
+    /diff: nodiff[\s\S]*text: set[\s\S]*eol: lf/,
+  );
+  assert.equal(
+    git(root, 'diff', '--', 'pnpm-lock.yaml').trim(),
+    'Diff skipped: pnpm-lock.yaml',
+  );
+  git(root, 'config', 'difftool.probe.cmd', `touch "${sentinel}"`);
+  const output = git(
+    root,
+    'difftool',
+    '--no-prompt',
+    '--tool=probe',
+    '--',
+    'pnpm-lock.yaml',
+  );
+  assert.equal(output.trim(), 'Diff skipped: pnpm-lock.yaml');
+  await assert.rejects(stat(sentinel), /ENOENT/);
+  assert.doesNotMatch(output, /before|after/);
+});
+
+test('fresh clone restores only local nodiff configuration on reapply', async (t) => {
+  const source = await fixture(t);
+  const clone = await fixture(t);
+  git(source, 'init', '-q');
+  git(source, 'config', 'user.name', 'Test');
+  git(source, 'config', 'user.email', 'test@example.com');
+  await runAdd({ addon: 'gitattributes', cwd: source });
+  git(source, 'add', '.gitattributes');
+  git(source, 'commit', '-qm', 'attributes');
+  await rm(clone, { recursive: true, force: true });
+  execFileSync('git', ['clone', '-q', source, clone]);
+  const before = await readFile(join(clone, '.gitattributes'), 'utf8');
+  assert.throws(() =>
+    git(clone, 'config', '--local', '--get', nodiffDriverKey),
+  );
+  const repaired = await runAdd({ addon: 'gitattributes', cwd: clone });
+  assert.equal(repaired.status, 'applied');
+  assert.deepEqual(repaired.changed, []);
+  assert.deepEqual(repaired.effects, [
+    { kind: 'git-config', scope: 'local', key: nodiffDriverKey },
+  ]);
+  assert.equal(await readFile(join(clone, '.gitattributes'), 'utf8'), before);
+  assert.equal(
+    (await runAdd({ addon: 'gitattributes', cwd: clone })).status,
+    'no-op',
   );
 });
 
@@ -430,19 +608,18 @@ test('gitattributes preserves user rules, regenerates its block, and appends nat
   const initial = await readFile(path, 'utf8');
   assert.match(initial, /^\*\.png binary\n\n# BEGIN LEFTIUM GITATTRIBUTES/m);
   assert.ok(
-    initial.indexOf('* text=auto eol=lf') <
-      initial.indexOf('vendor.lock -diff'),
+    initial.indexOf('* text=auto !eol') < initial.indexOf('vendor.lock -diff'),
   );
   await writeFile(
     path,
-    initial.replace('* text=auto eol=lf', 'edited managed content'),
+    initial.replace('* text=auto !eol', 'edited managed content'),
   );
   assert.equal(
     (await runAdd({ addon: 'gitattributes', cwd: root, preset: 'eol' })).status,
     'applied',
   );
   const regenerated = await readFile(path, 'utf8');
-  assert.match(regenerated, /\* text=auto eol=lf/);
+  assert.match(regenerated, /\* text=auto !eol/);
   assert.doesNotMatch(regenerated, /edited managed content/);
   assert.match(regenerated, /vendor\.lock -diff\n# Keep this comment/);
 });
@@ -468,6 +645,7 @@ test('gitattributes refuses malformed markers and conflicting user rules before 
     'package-lock.json diff\n',
   ]) {
     const root = await fixture(t, { '.gitattributes': text });
+    git(root, 'init', '-q');
     const result = await runAdd({
       addon: 'gitattributes',
       cwd: root,

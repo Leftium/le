@@ -1,5 +1,6 @@
-package-lock.json text eol=lf -diff
-npm-shrinkwrap.json text eol=lf -diff
-pnpm-lock.yaml text eol=lf -diff
-yarn.lock text eol=lf -diff
-bun.lock text eol=lf -diff
+package-lock.json text eol=lf diff=nodiff
+npm-shrinkwrap.json text eol=lf diff=nodiff
+pnpm-lock.yaml text eol=lf diff=nodiff
+yarn.lock text eol=lf diff=nodiff
+bun.lock text eol=lf diff=nodiff
+*.lockb binary diff=nodiff

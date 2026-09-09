@@ -1,11 +1,12 @@
 # BEGIN LEFTIUM GITATTRIBUTES
-# Managed by Leftium. Selected presets: nodiff, eol.
-# Regenerate: le add gitattributes --preset nodiff --preset eol
+# Managed by Leftium. Selected presets: nodiff.
+# Regenerate: le add gitattributes --preset nodiff
+# diff=nodiff requires the local Git driver; rerun this command after cloning.
 # Put custom rules outside this block or in .leftium/gitattributes.override.
-package-lock.json text eol=lf -diff
-npm-shrinkwrap.json text eol=lf -diff
-pnpm-lock.yaml text eol=lf -diff
-yarn.lock text eol=lf -diff
-bun.lock text eol=lf -diff
-* text=auto eol=lf
+package-lock.json text eol=lf diff=nodiff
+npm-shrinkwrap.json text eol=lf diff=nodiff
+pnpm-lock.yaml text eol=lf diff=nodiff
+yarn.lock text eol=lf diff=nodiff
+bun.lock text eol=lf diff=nodiff
+*.lockb binary diff=nodiff
 # END LEFTIUM GITATTRIBUTES

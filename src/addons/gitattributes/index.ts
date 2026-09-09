@@ -1,5 +1,7 @@
 import { join } from 'node:path';
+import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { promisify } from 'node:util';
 import { Stopped } from '../../orchestration/stopped.js';
 import type { ProjectContext } from '../../project/context.js';
 import { readRegular, type Mutation } from '../../project/files.js';
@@ -11,6 +13,26 @@ export type GitattributesRequest = {
 };
 export type Preset = { lines: string[] } | { presets: string[] };
 export type PresetCatalog = Record<string, Preset>;
+
+// TODO: Revisit ownership when add-ons can compose other add-ons. The
+// gitattributes preset should then own only attributes, while a gitconfig
+// add-on owns the driver and a nodiff add-on composes both. Keep setup atomic
+// here until that composition exists; a printed follow-up command is too easy
+// to skip and would leave the generated attribute only partly configured.
+export type GitConfigPlan = {
+  root: string;
+  key: typeof nodiffDriverKey;
+  value: typeof nodiffDriverValue;
+  install: boolean;
+};
+export type GitattributesPlan = {
+  edits: Mutation[];
+  gitConfig?: GitConfigPlan;
+};
+
+const exec = promisify(execFile);
+export const nodiffDriverKey = 'diff.nodiff.command';
+export const nodiffDriverValue = 'f () { echo "Diff skipped: $1"; }; f "$1"';
 
 export const builtinPresets: PresetCatalog = {
   nodiff: {
@@ -75,7 +97,78 @@ export function resolvePresets(
     if (!names.includes(name)) names.push(name);
     visit(name);
   }
-  return { names, lines };
+  return {
+    names,
+    lines: [
+      ...lines.filter((line) => line.startsWith('* ')),
+      ...lines.filter((line) => !line.startsWith('* ')),
+    ],
+  };
+}
+
+async function localDriverPlan(root: string): Promise<GitConfigPlan> {
+  let values: string[];
+  try {
+    const { stdout } = await exec(
+      'git',
+      ['-C', root, 'config', '--local', '--null', '--get-all', nodiffDriverKey],
+      { timeout: 3000 },
+    );
+    values = stdout.split('\0').filter((value) => value.length > 0);
+  } catch (error) {
+    if ((error as { code?: string | number }).code === 1) values = [];
+    else
+      throw new Error(
+        'The nodiff preset requires an available, writable local Git repository.',
+      );
+  }
+  if (
+    values.length > 1 ||
+    (values.length === 1 && values[0] !== nodiffDriverValue)
+  ) {
+    throw new Stopped(
+      'conflict',
+      `${nodiffDriverKey} is already configured locally with a different value. Current: ${values.join(' | ')}. Desired: ${nodiffDriverValue}`,
+    );
+  }
+  return {
+    root,
+    key: nodiffDriverKey,
+    value: nodiffDriverValue,
+    install: values.length === 0,
+  };
+}
+
+export async function applyGitConfig(plan: GitConfigPlan): Promise<boolean> {
+  if (!plan.install) return false;
+  await exec(
+    'git',
+    ['-C', plan.root, 'config', '--local', plan.key, plan.value],
+    { timeout: 3000 },
+  );
+  return true;
+}
+
+export async function removeGitConfig(plan: GitConfigPlan): Promise<void> {
+  await exec(
+    'git',
+    [
+      '-C',
+      plan.root,
+      'config',
+      '--local',
+      '--fixed-value',
+      '--unset-all',
+      plan.key,
+      plan.value,
+    ],
+    { timeout: 3000 },
+  );
+}
+
+export async function verifyGitConfig(plan: GitConfigPlan): Promise<void> {
+  const current = await localDriverPlan(plan.root);
+  if (current.install) throw new Error(`Verification failed: ${plan.key}`);
 }
 
 type Line = {
@@ -153,6 +246,11 @@ function renderBlock(
     begin,
     `# Managed by Leftium. Selected presets: ${names.join(', ')}.`,
     `# Regenerate: ${command}`,
+    ...(names.includes('nodiff')
+      ? [
+          '# diff=nodiff requires the local Git driver; rerun this command after cloning.',
+        ]
+      : []),
     '# Put custom rules outside this block or in .leftium/gitattributes.override.',
     ...lines,
   ].join(eol);
@@ -210,9 +308,19 @@ function reconcile(
 export async function planGitattributes(
   context: ProjectContext,
   request: GitattributesRequest,
-): Promise<Mutation[]> {
+): Promise<GitattributesPlan> {
   const root = context.gitRoot ?? context.target;
   const resolved = resolvePresets(requestedNames(request.preset));
+  const gitConfig = resolved.names.includes('nodiff')
+    ? context.gitRoot
+      ? await localDriverPlan(context.gitRoot)
+      : (() => {
+          throw new Stopped(
+            'unsupported',
+            'The nodiff preset requires an available local Git repository; no files were changed.',
+          );
+        })()
+    : undefined;
   const path = join(root, '.gitattributes');
   const override = await readRegular(
     join(root, '.leftium', 'gitattributes.override'),
@@ -230,5 +338,8 @@ export async function planGitattributes(
     ...resolved.lines,
     ...overrideLines,
   ]);
-  return after === existing ? [] : [{ path, before: existing, after }];
+  return {
+    edits: after === existing ? [] : [{ path, before: existing, after }],
+    gitConfig,
+  };
 }

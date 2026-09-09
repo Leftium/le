@@ -137,7 +137,12 @@ export function createCommand(): Command {
           result.status === 'applied' || result.status === 'no-op';
         const output = success ? process.stdout : process.stderr;
         output.write(`${result.status}: ${result.message}\n`);
-        for (const path of result.changed) output.write(`  ${path}\n`);
+        for (const effect of result.effects)
+          output.write(
+            effect.kind === 'file'
+              ? `  ${effect.path}\n`
+              : `  local Git config: ${effect.key}\n`,
+          );
         process.exitCode = success ? 0 : 1;
       },
     );

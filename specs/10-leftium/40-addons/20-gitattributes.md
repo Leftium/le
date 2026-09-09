@@ -14,8 +14,8 @@ le add gitattributes --preset nodiff --preset eol
 
 The exact default composition is provisional. v0 must include `nodiff` and `eol` as independently selectable presets:
 
-- `nodiff` keeps machine-generated files as normalized text while hiding their contents from ordinary diffs. Initial rules should cover common lockfiles; select the diff attribute through the experiment below.
-- `eol` establishes the project's general text and line-ending policy, normally `* text=auto eol=lf`.
+- `nodiff` keeps machine-generated files out of ordinary diff and difftool review by assigning `diff=nodiff` and configuring its driver locally. Initial rules cover npm, pnpm, Yarn, and Bun lockfiles. `bun.lock` remains text; `*.lockb` retains compatibility with Bun's older binary format.
+- `eol` uses `* text=auto !eol`. Git detects text and normalizes it to LF in the repository while working-tree endings remain subject to Git configuration and platform defaults. Specific machine-file rules set `eol=lf` when their working-tree format must also be LF.
 
 Candidates such as `binary` and `linguist` may be added later. A built-in `leftium` composite may combine the preferred purpose-specific presets rather than duplicate their rules.
 
@@ -23,23 +23,33 @@ The root here is the repository root, detected from Git or explicitly selected a
 
 ## Git configuration
 
-Before choosing a representation, compare `package-lock.json text eol=lf -diff` with a custom `diff=nodiff` driver in a disposable Git fixture. Inspect ordinary diff output and the intended review tools, text normalization, clone portability, and repeated application.
+The `nodiff` preset uses this repository-local driver:
+
+```gitconfig
+diff.nodiff.command = f () { echo "Diff skipped: $1"; }; f "$1"
+```
+
+Before writing `.gitattributes`, Leftium requires a Git repository and reads every local value for `diff.nodiff.command`. No local value installs the driver. One exact value is current. Multiple values or any different value produce a conflict that shows the current and desired values without overwriting either scope. A compatible global value does not replace local setup because global configuration is not clone-portable.
 
 ### Experiment: 2026-09-09
 
-A disposable repository committed a LF `package-lock.json`, then changed it with CRLF working-tree content. Native `-diff` produced Git's `Binary file modified (old: 45 B, new: 64 B)` summary in both ordinary and staged diff. A `diff=nodiff` driver configured locally with an empty `textconv` produced only `Diff skipped: package-lock.json` in both cases.
+A disposable repository committed a LF `package-lock.json`, then changed it with CRLF working-tree content. Native `-diff` produced Git's `Binary file modified (old: 45 B, new: 64 B)` summary in ordinary and staged diff. That experiment optimized for ordinary `git diff`, where native attributes were sufficient.
 
-Both forms retained `text eol=lf`: the committed and freshly cloned file used LF. Recheckout did not rewrite an already-present CRLF working-tree file in this fixture, so the attribute does not promise a forced working-tree rewrite. The custom driver's local `diff.nodiff.textconv` setting was absent after cloning; it must be configured per clone, although repeat configuration is idempotent.
+Later real-world evidence changed the requirement: the established review workflow uses `git difftool`, and `-diff` may still allow the lockfile path to reach that tool. A second disposable fixture assigned `diff=nodiff` and configured `diff.nodiff.command`. Both ordinary `git diff` and a deterministic command-based `git difftool` printed `Diff skipped: package-lock.json`; the configured difftool was not launched and lockfile content was not shown.
 
-The custom wording is not a meaningful review advantage over Git's native binary-change summary. v0 therefore uses native `-diff`, which suppresses textual hunks, retains text normalization, needs no Git-local configuration, and works in plain directories.
+Both representations retain explicit `text eol=lf` semantics on text lockfiles. v0 therefore uses `diff=nodiff`: the custom driver satisfies the proven review workflow, while native `-diff` satisfies only the earlier, narrower ordinary-diff requirement.
 
-Prefer native `-diff` if its binary-change summary provides acceptable suppression of textual hunks. Retain a custom driver only for a demonstrated presentation requirement that native attributes cannot meet. Record the observed behavior and selected representation in this spec before shipping; a custom driver is not an architectural requirement.
+The local driver is absent after cloning because `.git/config` is not tracked. The generated block names the regeneration command, and rerunning it repairs local configuration without changing tracked content. A first repair is `applied`; a subsequent fully current run is `no-op`.
 
-If a custom driver is selected, establish only project-local Git settings, preserve existing custom drivers or report a conflict, and document setup after cloning. Detect missing Git prerequisites before avoidable mutation. File generation without Git remains possible for presets that do not need local settings. Do not claim complete setup if required settings or verification failed.
+Preflight configuration conflicts and Git availability before mutation. Install the driver before writing `.gitattributes`; if the file mutation fails, remove only a driver that this run installed. Report retained partial state if rollback fails. Presets such as `eol` that need no local setting remain available in plain directories.
+
+### Deferred ownership boundary
+
+The v0 `nodiff` gitattributes preset owns both the attribute and its required local driver so one successful command leaves the behavior usable. Revisit that coupling when Leftium has add-on composition. The preferred long-term shape is a gitattributes preset that owns only native attributes, a gitconfig preset that owns only the driver, and a user-facing `nodiff` add-on that composes both. Requiring two manual commands is acceptable only if partial setup is explicit; printing an optional follow-up command is not preferred because users commonly skip it.
 
 ## Presets and overrides
 
-Each leaf preset is ordinary `.gitattributes` content. Composite presets are ordered lists of presets. Leftium resolves the list, detects cycles, and concatenates rules deterministically.
+Each leaf preset is ordinary `.gitattributes` content. Composite presets are ordered lists of presets. Leftium resolves the list, detects cycles, removes duplicates, and renders broad `*` defaults before specific rules regardless of request order. Native overrides remain last.
 
 The native syntax is already compact and readable. Wrapping every rule in a Leftium JSON or TypeScript schema would add ceremony without adding meaning.
 
@@ -53,6 +63,8 @@ Conflicting rules require an explanation. Resolve them only when precedence is d
 
 Generated content should name the selected presets and the command that refreshes it.
 
+Results retain `changed` as the file-only compatibility field and report all mutations as structured effects. File effects name `.gitattributes`; Git-config effects name the local key without presenting `.git/config` as a tracked path. Any effect makes the result `applied`, including a post-clone run that installs only the local driver.
+
 ## Verification
 
-Fixture tests must cover leaf presets, composition order, cycles, overrides, existing user content, conflicts, replacement of manually edited generated blocks, malformed markers, and an idempotent second run.
+Fixture tests must cover leaf presets, request-order-independent composition, attribute precedence, cycles, overrides, existing user content, conflicts, replacement of manually edited generated blocks, and an idempotent second run. Git fixtures must verify missing, exact, conflicting, and global-only driver states; missing Git or repository prerequisites before file mutation; actual `git diff` and deterministic `git difftool` suppression; and clone reapplication without tracked-file changes.

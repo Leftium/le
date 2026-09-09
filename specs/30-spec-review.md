@@ -26,7 +26,7 @@ The active [core policy](10-leftium/10-core-model.md#content-ownership-and-recon
 | Resolved | R3: Operation roots and workspace scope | Git is optional; package, workspace, and repository roots may differ | Support one selected package in a recognized workspace; keep operation scopes explicit |
 | Resolved | R4: Initial-creation replay contract | The recipe records starting choices, not subsequent project evolution | Use a structured request and versioned command; settle grammar and verify serialization during implementation |
 | High | R5: Pages delivery contract | First scope is prerendered SvelteKit; workflow distribution remains a gate | Define and release the narrow reusable workflow before consumer adoption |
-| Experiment | R6: `nodiff` representation | Native attributes may remove local driver setup | Compare native `-diff` and a custom driver in a disposable fixture before selecting |
+| Resolved | R6: `nodiff` representation | Native `-diff` does not satisfy the proven difftool workflow | Use `diff=nodiff` with a conflict-safe repository-local driver |
 | Resolved | R7: Installation and execution results | Partial work and skipped checks must remain visible | Coordinate installation, support no-install, inspect provider results, and stop on failure |
 | Medium | R8: Future lifecycle selection cannot always be inferred | `update` may claim ownership of manually configured tools | Distinguish observed state, managed intent, and provenance |
 | Resolved | R9: Engineering sequence | Creation integration needs early evidence | Spike creation after license; preserve v0 release scope and defer optional file reorganization |
@@ -131,7 +131,7 @@ package-lock.json text eol=lf -diff
 
 Git separates text normalization from diff presentation. Unsetting `diff` suppresses normal textual hunks and reports a binary difference; it does not hide the file from status or guarantee silence in every diff tool. This avoids a local driver setup dependency. [Git attributes documentation](https://git-scm.com/docs/gitattributes).
 
-Recommend this simpler representation if that presentation meets the user's intent. Retain `diff=nodiff` only if a concrete requirement calls for custom presentation, such as suppressing even the summary. Then specify which Git commands/tools honor it, how collaborators configure it after cloning, and what creation does before Git initialization. The active spec now requires the disposable-fixture comparison before choosing a representation; no experiment has been run yet.
+This was the initial recommendation under the narrower ordinary-`git diff` requirement. Later evidence from the user's established `git difftool` workflow showed that `-diff` may still send the lockfile path to the configured tool. The active spec records the follow-up fixture and supersedes this conclusion: v0 uses `diff=nodiff` with a repository-local `diff.nodiff.command`, conflict-safe setup, and explicit post-clone reapplication.
 
 ## R7. Define package operations and execution results
 
