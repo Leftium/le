@@ -6,6 +6,9 @@
     "node": ">=24.0.0 <25"
   },
   "packageManager": "pnpm@12.3.4",
+  "files": [
+    "dist"
+  ],
   "bin": {
     "leftium": "dist/src/cli/index.js",
     "le": "dist/src/cli/index.js"
@@ -14,6 +17,7 @@
     "build": "rescript && tsc",
     "typecheck": "rescript && tsc --noEmit",
     "test": "pnpm build && node --test dist/tests/*.test.js",
+    "prepack": "pnpm test",
     "dev:rescript": "rescript watch",
     "dev:typescript": "tsc --watch",
     "start": "node dist/src/cli/index.js"
