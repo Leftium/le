@@ -12,13 +12,13 @@ le add [options] [addon]
 
 When an interactive `license` invocation omits `--preset`, it selects from `mit`, `apache-2.0`, `bsd-3-clause`, and `isc`; MIT is the initial choice. Explicit presets bypass the menu. An interactive `gitattributes` invocation without `--preset` offers a multiselect with `nodiff` initially selected. Explicit presets bypass that menu; non-interactive omission retains the existing deterministic `nodiff` default.
 
-## Creation command (next milestone)
+## Experimental creation command
 
 ```text
-le create [directory] --template <creator>:<template> [--add <addon>]...
+le create <directory> --template <creator>:<template> [--add <addon>]...
 ```
 
-The shape is provisional until the [creation option and recipe contract](35-create.md) is finalized. Interactive prompts and explicit arguments must resolve to the same plan. Support `.` only under the same empty-destination checks as any other target. Ask only questions relevant to the selected creator and add-ons.
+A narrow Svelte creation implementation is published experimentally and serves as the creation architecture spike. Broader supported creation UX and environment coverage remain the next milestone. The current command requires a destination and supports the surface recorded in the [creation checkpoint](35-create.md#spike-checkpoint-2026-09-09). Interactive prompts and explicit arguments must resolve to the same plan. Support `.` only under the same empty-destination checks as any other target. Ask only questions relevant to the selected creator and add-ons.
 
 Use qualified template identifiers to resolve collisions. A short name is valid only when unambiguous or resolved by an explicitly configured default creator; never choose based on catalog order. `<creator>:<template>` is the working syntax, with final grammar settled before shipping creation. Creator-specific channels and versions retain their upstream meanings.
 

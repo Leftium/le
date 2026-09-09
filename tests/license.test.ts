@@ -73,27 +73,48 @@ test('pure classification distinguishes missing, equivalent, different, customiz
 });
 
 test('pure reconciliation requires choices and refuses inconsistent files even with force', () => {
-  assert.deepEqual(reconcile('Absent', false, true, false), {
+  assert.deepEqual(reconcile('Absent', false, true, false, 'MIT'), {
     TAG: 'Ready',
     writeLicense: true,
     writeMetadata: true,
   });
-  assert.deepEqual(reconcile('Correct', false, false, false), {
+  assert.deepEqual(reconcile('Correct', false, false, false, 'MIT'), {
     TAG: 'Ready',
     writeLicense: false,
     writeMetadata: false,
   });
   assert.equal(
-    reconcile('Customized', false, false, false).TAG,
+    reconcile('Customized', false, false, false, 'MIT').TAG,
     'RequireChoice',
   );
-  assert.equal(reconcile('Correct', true, false, false).TAG, 'RequireChoice');
-  assert.equal(reconcile('Inconsistent', false, false, true).TAG, 'Conflict');
-  assert.equal(reconcile('Customized', true, false, true).TAG, 'Ready');
+  assert.equal(
+    reconcile('Correct', true, false, false, 'Apache-2.0').TAG,
+    'RequireChoice',
+  );
+  assert.equal(
+    reconcile('Inconsistent', false, false, true, 'MIT').TAG,
+    'Conflict',
+  );
+  assert.equal(
+    reconcile('Customized', true, false, true, 'BSD-3-Clause').TAG,
+    'Ready',
+  );
   // This fixture is also a compile-time check of the generated boundary.
   // @ts-expect-error Invalid domain states must not silently cross from TypeScript.
   const invalid: state = 'Installed';
   void invalid;
+});
+
+test('runAdd uses the ReScript classification boundary', async (t) => {
+  const canonical = render(defaults.author, defaults.year);
+  const withoutHeading = canonical.replace('MIT License\n\n', '');
+  const root = await fixture(t, {
+    LICENSE: withoutHeading,
+    'package.json': '{"license":"MIT"}\n',
+  });
+  const result = await add(root);
+  assert.equal(result.status, 'no-op');
+  assert.equal(await readFile(join(root, 'LICENSE'), 'utf8'), withoutHeading);
 });
 
 test('plain directory needs no Git, manifest, or recipe; repeat does not rewrite', async (t) => {

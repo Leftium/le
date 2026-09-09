@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import * as prompts from '@clack/prompts';
 import { runAdd } from '../orchestration/add.js';
-import { runCreate } from '../orchestration/create.js';
+import { CreateFailure, runCreate } from '../orchestration/create.js';
 import type { Interaction, LicenseRequest } from '../addons/license/index.js';
 import { version } from '../version.js';
 
@@ -31,7 +31,7 @@ function interactive(options: { nonInteractive?: boolean }): boolean {
 
 export function createCommand(): Command {
   const program = new Command('leftium')
-    .description('Apply project conventions to existing directories.')
+    .description('Create projects and apply project conventions.')
     .version(version)
     .addHelpText('before', `leftium ${version}\n\n`)
     .action(() => program.outputHelp());
@@ -189,6 +189,24 @@ export function createCommand(): Command {
         if (result.warning)
           process.stderr.write(`warning: ${result.warning}\n`);
       } catch (error: unknown) {
+        if (error instanceof CreateFailure) {
+          const result = error.result;
+          process.stderr.write(`failed: ${result.message}\n`);
+          process.stderr.write(`  destination: ${result.destination}\n`);
+          process.stderr.write(
+            `  completed: ${result.completed.join(', ') || 'none'}\n`,
+          );
+          process.stderr.write(
+            `  files remain: ${result.filesRemain ? 'yes' : 'no'}\n`,
+          );
+          process.stderr.write(`  installation: ${result.installation}\n`);
+          process.stderr.write(
+            `  recipe written: ${result.recipeWritten ? 'yes' : 'no'}\n`,
+          );
+          process.stderr.write(`  next: ${result.nextStep}\n`);
+          process.exitCode = 1;
+          return;
+        }
         process.stderr.write(
           `failed: ${error instanceof Error ? error.message : String(error)}\n`,
         );

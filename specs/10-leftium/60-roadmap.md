@@ -41,6 +41,16 @@ Their aggregation, version, exit-code, and interactive behavior remains unresolv
 
 `doctor` checks the Leftium environment, such as Git, Node, package-manager, and optional tool availability. It is distinct from `check`, which inspects the project.
 
+### Non-adopting project operations
+
+Leftium may eventually distinguish adopting a persistent project capability (`add`) from invoking a project-aware capability without adopting its configuration. The CLI spelling is unresolved; `run` is provisional.
+
+Invocation may be read-only, runtime-only, or intentionally mutating. "Non-adopting" describes provisioning and persistent configuration, not the side effects of the invoked operation.
+
+For example, `le add deva` could install and configure Deva as a persistent project capability, while a possible `le run deva` could provide temporary, project-aware Vite access without permanently installing or configuring it. The runtime mechanics belong in Deva's own specification, not Leftium's core architecture.
+
+A package-version operation is a distinct motivating case. A command such as `le run version patch` could intentionally modify package version state without requiring a persistent "version add-on" installation. Do not introduce a generic operation or plugin protocol until implementation of these cases establishes a reusable boundary.
+
 ## Mines and locking
 
 [Resolution and mines](50-resolution-and-mines.md) describes the extension model. Mine commands, manifests, qualification, dependency resolution, remote fetching, and lockfiles should be designed together. Reproducibility is required before remote inputs can support automated updates.

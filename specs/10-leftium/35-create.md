@@ -1,6 +1,6 @@
 # Project creation
 
-**Status:** Draft; internal spike during v0, supported creation in the next milestone.
+**Status:** Draft; a narrow Svelte implementation is published experimentally and serves as the creation architecture spike. Broader supported creation UX and environment coverage remain the next milestone.
 
 `le create` uses an upstream creator to establish a project, runs the existing add-on pipeline, and records enough resolved input to recreate that starting point. The first backend is `sv`; additional backends wait until this integration demonstrates the boundary.
 

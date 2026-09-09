@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import {
+  chmod,
   mkdtemp,
   mkdir,
   readFile,
@@ -13,6 +14,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { promisify } from 'node:util';
 import {
+  CreateFailure,
   recreationRecipeArgv,
   renderRecipe,
   runCreate,
@@ -110,6 +112,38 @@ test('composes the official Prettier add-on and the Leftium license add-on', asy
     await readFile(join(cwd, 'README.md'), 'utf8'),
     /--add prettier --add license/,
   );
+});
+
+test('installation failure reports partial work without writing a Leftium recipe', async () => {
+  const cwd = await destination('failed-install');
+  const bin = await mkdtemp(join(tmpdir(), 'leftium-fake-bin-'));
+  const npm = join(bin, 'npm');
+  await writeFile(
+    npm,
+    '#!/bin/sh\necho "fixture install failure" >&2\nexit 23\n',
+  );
+  await chmod(npm, 0o755);
+  const previousPath = process.env.PATH;
+  process.env.PATH = `${bin}:${previousPath ?? ''}`;
+  try {
+    await assert.rejects(
+      () => runCreate({ cwd, packageManager: 'npm' }),
+      (error: unknown) => {
+        assert.ok(error instanceof CreateFailure);
+        assert.deepEqual(error.result.completed, ['scaffold', 'add-ons']);
+        assert.equal(error.result.filesRemain, true);
+        assert.equal(error.result.installation, 'failed');
+        assert.equal(error.result.recipeWritten, false);
+        assert.match(error.result.nextStep, /npm install/);
+        return true;
+      },
+    );
+  } finally {
+    process.env.PATH = previousPath;
+  }
+  const readme = await readFile(join(cwd, 'README.md'), 'utf8');
+  assert.doesNotMatch(readme, /leftium:creation-recipe/);
+  assert.match(readme, /npx sv create my-app/);
 });
 
 test('replays the recorded recipe through the packed local CLI', async () => {

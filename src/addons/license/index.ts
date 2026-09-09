@@ -5,6 +5,7 @@ import { parseTree } from 'jsonc-parser';
 import { gitValue, type ProjectContext } from '../../project/context.js';
 import { readRegular, type Mutation } from '../../project/files.js';
 import { Stopped } from '../../orchestration/stopped.js';
+import { decide } from './License.gen.js';
 
 export type LicensePreset = 'mit' | 'apache-2.0' | 'bsd-3-clause' | 'isc';
 export type LicenseRequest = {
@@ -51,9 +52,6 @@ export function renderLicense(
   input?: { author: string; year: string },
 ): string {
   return render(id, input);
-}
-function normalize(text: string): string {
-  return text.replace(/\s+/g, ' ').trim();
 }
 function recognize(text: string): LicensePreset | undefined {
   if (/Apache License\s*Version 2\.0/i.test(text)) return 'apache-2.0';
@@ -243,21 +241,20 @@ export async function planLicense(
     input = { author: author.trim(), year };
   }
   const desired = render(definition.id, input);
-  const equal =
-    files.length > 0 &&
-    files.every((file) => normalize(file.text) === normalize(files[0]!.text));
-  if (files.length > 1 && !equal)
-    throw new Stopped(
-      'conflict',
-      'Multiple inconsistent license files; resolve them before retrying.',
-    );
-  const correct = equal && normalize(files[0]!.text) === normalize(desired);
   const metadata = context.manifest?.data.license,
-    metadataConflict = metadata !== undefined && metadata !== definition.spdx;
-  if (((files.length && !correct) || metadataConflict) && !request.force) {
-    const answer = await interaction?.confirm(
-      `Existing license or package.json metadata differs. Replace it with ${definition.spdx}?`,
-    );
+    metadataConflict = metadata !== undefined && metadata !== definition.spdx,
+    metadataMissing = context.manifest !== undefined && metadata === undefined;
+  let decision = decide(
+    files.map((file) => file.text),
+    desired,
+    metadataConflict,
+    metadataMissing,
+    request.force ?? false,
+    definition.spdx,
+  );
+  if (decision.TAG === 'Conflict') throw new Stopped('conflict', decision._0);
+  if (decision.TAG === 'RequireChoice') {
+    const answer = await interaction?.confirm(decision._0);
     if (answer === undefined)
       throw new Stopped(
         interaction ? 'canceled' : 'conflict',
@@ -267,14 +264,24 @@ export async function planLicense(
       );
     if (!answer)
       throw new Stopped('conflict', 'Use --force to approve replacement.');
+    decision = decide(
+      files.map((file) => file.text),
+      desired,
+      metadataConflict,
+      metadataMissing,
+      true,
+      definition.spdx,
+    );
   }
+  if (decision.TAG !== 'Ready')
+    throw new Error('License reconciliation did not resolve after approval.');
   const edits: Mutation[] = [];
-  if (!correct)
+  if (decision.writeLicense)
     for (const file of files.length
       ? files
       : [{ path: join(context.target, 'LICENSE'), text: undefined }])
       edits.push({ path: file.path, before: file.text, after: desired });
-  if (context.manifest && (metadata === undefined || metadataConflict)) {
+  if (context.manifest && decision.writeMetadata) {
     const after = updateMetadata(context.manifest.text, definition.spdx);
     if (after !== context.manifest.text)
       edits.push({

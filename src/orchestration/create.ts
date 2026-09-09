@@ -24,6 +24,33 @@ export type CreateRequest = {
   install?: boolean;
 };
 
+export type CreateStep =
+  'scaffold' | 'add-ons' | 'installation' | 'verification' | 'recipe';
+export type CreateFailureResult = {
+  status: 'failed';
+  destination: string;
+  completed: CreateStep[];
+  filesRemain: boolean;
+  installation:
+    'not-requested' | 'not-started' | 'started' | 'completed' | 'failed';
+  recipeWritten: boolean;
+  message: string;
+  nextStep: string;
+};
+
+export class CreateFailure extends Error {
+  constructor(
+    public readonly result: CreateFailureResult,
+    cause: unknown,
+  ) {
+    super(
+      `${result.message}\nDestination: ${result.destination}\nCompleted: ${result.completed.join(', ') || 'none'}\nFiles remain: ${result.filesRemain ? 'yes' : 'no'}\nInstallation: ${result.installation}\nRecipe written: ${result.recipeWritten ? 'yes' : 'no'}\nNext step: ${result.nextStep}`,
+      { cause },
+    );
+    this.name = 'CreateFailure';
+  }
+}
+
 async function installDependencies(
   packageManager: 'npm' | 'pnpm',
   cwd: string,
@@ -107,7 +134,7 @@ async function writeRecipe(cwd: string, command: string): Promise<void> {
   await writeFile(path, next);
 }
 
-export async function runCreate(
+async function executeCreate(
   input: CreateRequest,
 ): Promise<{ cwd: string; installed: boolean; warning?: string }> {
   const cwd = resolve(input.cwd);
@@ -143,44 +170,135 @@ export async function runCreate(
     ? await resolveNewLicenseRequest(baseRequest, dirname(cwd))
     : undefined;
   const request = { ...baseRequest, ...license } as const;
+  const completed: CreateStep[] = [];
+  let installation: CreateFailureResult['installation'] = request.install
+    ? 'not-started'
+    : 'not-requested';
+  let installationFailed = false;
+  let recipeWritten = false;
   try {
-    if ((await lstat(cwd)).isSymbolicLink())
-      throw new Error(`Destination must not be a symbolic link: ${cwd}`);
-    if ((await readdir(cwd)).length)
-      throw new Error(`Destination is not empty: ${cwd}`);
+    try {
+      if ((await lstat(cwd)).isSymbolicLink())
+        throw new Error(`Destination must not be a symbolic link: ${cwd}`);
+      if ((await readdir(cwd)).length)
+        throw new Error(`Destination is not empty: ${cwd}`);
+    } catch (error: unknown) {
+      if (!(
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'ENOENT'
+      ))
+        throw error;
+      await mkdir(cwd, { recursive: true });
+    }
+    create({
+      cwd,
+      name: basename(cwd),
+      template: request.template,
+      types: request.types,
+    });
+    completed.push('scaffold');
+    if (request.addons.includes('prettier')) {
+      await add({
+        addons: { prettier: officialAddons.prettier },
+        cwd,
+        options: { prettier: {} },
+        packageManager: request.packageManager,
+      });
+    }
+    if (request.addons.includes('license')) {
+      const result = await runAdd({
+        addon: 'license',
+        cwd,
+        author: request.author,
+        year: request.year,
+      });
+      if (result.status !== 'applied' && result.status !== 'no-op')
+        throw new Error(`License add-on failed: ${result.message}`);
+    }
+    completed.push('add-ons');
+    let warning: string | undefined;
+    if (request.install) {
+      installation = 'started';
+      try {
+        warning = await installDependencies(request.packageManager, cwd);
+        installation = 'completed';
+      } catch (error) {
+        installation = 'failed';
+        installationFailed = true;
+        throw error;
+      }
+      completed.push('installation');
+    }
+    await Promise.all([
+      readFile(resolve(cwd, 'package.json'), 'utf8'),
+      readFile(resolve(cwd, 'README.md'), 'utf8'),
+    ]);
+    completed.push('verification');
+    await writeRecipe(cwd, renderRecipe(recreationRecipeArgv(request)));
+    recipeWritten = true;
+    completed.push('recipe');
+    return { cwd, installed: request.install, warning };
   } catch (error: unknown) {
-    if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT'))
-      throw error;
-    await mkdir(cwd, { recursive: true });
+    if (error instanceof CreateFailure) throw error;
+    let filesRemain = false;
+    try {
+      filesRemain = (await readdir(cwd)).length > 0;
+    } catch {
+      // The destination may not have been created yet.
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    const nextStep = installationFailed
+      ? `Resolve the installation error, then run ${request.packageManager} install in ${cwd}. The Leftium recipe was not written.`
+      : completed.length === 0 && filesRemain
+        ? 'The destination was not modified. Choose a missing or empty destination and retry.'
+        : filesRemain
+          ? `Inspect the partial project at ${cwd}, resolve the error, and retry with a new empty destination.`
+          : 'Resolve the reported error and retry the creation command.';
+    throw new CreateFailure(
+      {
+        status: 'failed',
+        destination: cwd,
+        completed,
+        filesRemain,
+        installation,
+        recipeWritten,
+        message,
+        nextStep,
+      },
+      error,
+    );
   }
+}
 
-  create({
-    cwd,
-    name: basename(cwd),
-    template: request.template,
-    types: request.types,
-  });
-  if (request.addons.includes('prettier')) {
-    await add({
-      addons: { prettier: officialAddons.prettier },
-      cwd,
-      options: { prettier: {} },
-      packageManager: request.packageManager,
-    });
+export async function runCreate(
+  input: CreateRequest,
+): Promise<{ cwd: string; installed: boolean; warning?: string }> {
+  const destination = resolve(input.cwd);
+  try {
+    return await executeCreate(input);
+  } catch (error: unknown) {
+    if (error instanceof CreateFailure) throw error;
+    let filesRemain = false;
+    try {
+      filesRemain = (await readdir(destination)).length > 0;
+    } catch {
+      // Preflight may fail before the destination exists.
+    }
+    throw new CreateFailure(
+      {
+        status: 'failed',
+        destination,
+        completed: [],
+        filesRemain,
+        installation: (input.install ?? true) ? 'not-started' : 'not-requested',
+        recipeWritten: false,
+        message: error instanceof Error ? error.message : String(error),
+        nextStep: filesRemain
+          ? 'The destination was not modified. Choose a missing or empty destination and retry.'
+          : 'Resolve the reported input or environment error and retry the creation command.',
+      },
+      error,
+    );
   }
-  if (request.addons.includes('license')) {
-    const result = await runAdd({
-      addon: 'license',
-      cwd,
-      author: request.author,
-      year: request.year,
-    });
-    if (result.status !== 'applied' && result.status !== 'no-op')
-      throw new Error(`License add-on failed: ${result.message}`);
-  }
-  await writeRecipe(cwd, renderRecipe(recreationRecipeArgv(request)));
-  const warning = request.install
-    ? await installDependencies(request.packageManager, cwd)
-    : undefined;
-  return { cwd, installed: request.install, warning };
 }

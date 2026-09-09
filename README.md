@@ -1,6 +1,6 @@
 # Leftium
 
-Leftium applies project conventions through add-ons. The implemented built-ins are `le add license` and `le add gitattributes`. A narrow Svelte creation spike is validated, while supported creation, the Pages add-on, and transparent `sv add` delegation remain in progress; see the [active spec](specs/10-leftium/00-spec.md).
+Leftium creates projects and applies project conventions through add-ons. The implemented built-ins are `le add license` and `le add gitattributes`. A narrow Svelte creation implementation is published experimentally and serves as the creation architecture spike. Broader supported creation UX and environment coverage, the Pages add-on, and transparent `sv add` delegation remain in progress; see the [active spec](specs/10-leftium/00-spec.md).
 
 Install the published CLI with Node 24:
 
@@ -9,6 +9,7 @@ pnpm add -g leftium
 
 le --version
 le --help
+le create my-app --no-install
 le add license
 le add gitattributes --preset nodiff
 ```
@@ -66,7 +67,7 @@ npm package settings: GitHub Actions, owner `Leftium`, repository `le`, and
 workflow filename `publish.yml`. Allow direct `npm publish`. This workflow uses
 GitHub Actions OIDC, so no npm token or Git tag push is required.
 
-TypeScript owns discovery, prompts, file edits, and reporting. [License.res](src/addons/license/License.res) owns MIT rendering, state classification, and reconciliation decisions. [runAdd](src/orchestration/add.ts) accepts ordinary requests without Commander, so tests and the CLI share orchestration.
+TypeScript owns discovery, template loading and rendering, prompts, file edits, and reporting. [License.res](src/addons/license/License.res) owns license-state classification and reconciliation decisions for the MIT, Apache-2.0, BSD-3-Clause, and ISC presets. [runAdd](src/orchestration/add.ts) accepts ordinary requests without Commander, so tests and the CLI share orchestration.
 
 ReScript's [genType integration](https://rescript-lang.org/docs/manual/typescript-integration/) generates the typed import used by TypeScript. Generated `.res.js`, `.gen.tsx`, and `dist/` files are ignored and rebuilt locally. Edit the `.res` source instead of those generated files. The build uses the ReScript compiler and `tsc` directly, without a bundler.
 
