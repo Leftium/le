@@ -34,5 +34,6 @@
     "@types/node": "^24.13.3",
     "rescript": "12.3.1",
     "typescript": "7.0.2"
-  }
+  },
+  "license": "MIT"
 }
