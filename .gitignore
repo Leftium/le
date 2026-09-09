@@ -1,0 +1,7 @@
+node_modules/
+dist/
+lib/
+*.res.js
+*.gen.tsx
+.rescript-*
+.DS_Store
