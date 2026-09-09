@@ -18,6 +18,10 @@ function terminalInteraction(): Interaction {
   };
 }
 
+function interactive(options: { nonInteractive?: boolean }): boolean {
+  return !options.nonInteractive && Boolean(process.stdin.isTTY && process.stdout.isTTY) && !process.env.CI;
+}
+
 export function createCommand(): Command {
   const program = new Command('leftium')
     .description('Apply project conventions to existing directories.')
@@ -25,18 +29,35 @@ export function createCommand(): Command {
     .addHelpText('before', `leftium ${version}\n\n`)
     .action(() => program.outputHelp());
   program.command('add')
-    .argument('<addon>', 'add-on to apply (license or gitattributes)')
+    .argument('[addon]', 'add-on to apply (license or gitattributes; choose interactively when omitted)')
     .option('-C, --cwd <dir>', 'target directory')
-    .option('--preset <name>', 'add-on preset (repeatable)', (value, previous: string[] = []) => [...previous, value], [])
+    .option('--preset <name>', 'add-on preset (repeatable)', (value, previous: string[] | undefined) => [...(previous ?? []), value])
     .option('--author <name>', 'copyright holder')
     .option('--year <year>', 'copyright year or range')
     .option('--force', 'replace conflicting license content and package license metadata')
     .option('--package-license', 'explicitly add a separate license at the selected workspace package')
     .option('--non-interactive', 'never prompt; fail when a required choice is missing')
     .option('--no-install', 'skip dependency installation (license needs no installation)')
-    .action(async (addon: string, options: LicenseRequest & { nonInteractive?: boolean }) => {
-      const interactive = !options.nonInteractive && Boolean(process.stdin.isTTY && process.stdout.isTTY) && !process.env.CI;
-      const result = await runAdd({ ...options, addon }, interactive ? terminalInteraction() : undefined);
+    .action(async (addon: string | undefined, options: LicenseRequest & { nonInteractive?: boolean }) => {
+      const tty = interactive(options);
+      if (!addon) {
+        if (!tty) { process.stderr.write('failed: Supply an add-on (license or gitattributes); selection requires an interactive terminal.\n'); process.exitCode = 1; return; }
+        const choice = await prompts.select({ message: 'What would you like to add?', options: [{ value: 'license', label: 'License' }, { value: 'gitattributes', label: 'Git attributes' }] });
+        if (prompts.isCancel(choice)) { process.stderr.write('canceled: Canceled before writing.\n'); process.exitCode = 1; return; }
+        addon = choice as 'license' | 'gitattributes';
+      }
+      if (tty && addon === 'license' && options.preset === undefined) {
+        const choice = await prompts.select({ message: 'Select a license', initialValue: 'mit', options: [{ value: 'mit', label: 'MIT' }, { value: 'apache-2.0', label: 'Apache 2.0' }, { value: 'bsd-3-clause', label: 'BSD 3-Clause' }, { value: 'isc', label: 'ISC' }] });
+        if (prompts.isCancel(choice)) { process.stderr.write('canceled: Canceled before writing.\n'); process.exitCode = 1; return; }
+        options.preset = choice as string;
+      }
+      if (tty && addon === 'gitattributes' && options.preset === undefined) {
+        const choice = await prompts.multiselect({ message: 'Select git attribute presets', required: true, initialValues: ['nodiff'], options: [{ value: 'nodiff', label: 'nodiff' }, { value: 'eol', label: 'eol' }] });
+        if (prompts.isCancel(choice)) { process.stderr.write('canceled: Canceled before writing.\n'); process.exitCode = 1; return; }
+        options.preset = choice as string[];
+      }
+      if (!addon) throw new Error('Add-on selection did not resolve.');
+      const result = await runAdd({ ...options, addon }, tty ? terminalInteraction() : undefined);
       const success = result.status === 'applied' || result.status === 'no-op';
       const output = success ? process.stdout : process.stderr;
       output.write(`${result.status}: ${result.message}\n`);

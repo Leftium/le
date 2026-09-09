@@ -5,10 +5,12 @@ The npm package is `leftium`. It exposes `leftium` as the canonical command and 
 ## v0 command
 
 ```text
-le add <addon> [options]
+le add [options] [addon]
 ```
 
-`add` detects the project, resolves the add-on, inspects existing state, plans the change, then applies and verifies it.
+`add` detects the project, resolves the add-on, inspects existing state, plans the change, then applies and verifies it. In an interactive terminal, omitting `addon` opens a selector for `license` or `gitattributes`. Supplying an add-on never opens that selector. Outside an interactive terminal, an omitted add-on fails before mutation.
+
+When an interactive `license` invocation omits `--preset`, it selects from `mit`, `apache-2.0`, `bsd-3-clause`, and `isc`; MIT is the initial choice. Explicit presets bypass the menu. An interactive `gitattributes` invocation without `--preset` offers a multiselect with `nodiff` initially selected. Explicit presets bypass that menu; non-interactive omission retains the existing deterministic `nodiff` default.
 
 ## Creation command (next milestone)
 
@@ -92,7 +94,7 @@ See [Implementation architecture](20-architecture.md) for the internal boundary.
 
 ## Automation
 
-All supported operations should have a non-interactive path. Missing choices may prompt in a terminal, but automation must be able to provide them as flags or configuration.
+All supported operations should have a non-interactive path. Missing choices may prompt only when both standard input and output are TTYs and CI is not set; automation must be able to provide them as flags or configuration. `--non-interactive` never opens a menu. Cancellation exits nonzero without mutation.
 
 Commands must report changed and newly created files, package operations, delegated commands, local Git-setting changes, and manual follow-up. A concise result summary, supplemented by a version-control diff when available, is the default review experience; displaying a complete diff or asking for approval before every routine edit is not required. Dry-run and structured agent output are [post-v0 work](60-roadmap.md#dry-run-and-agent-support).
 

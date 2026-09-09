@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { Stopped } from '../../orchestration/stopped.js';
 import type { ProjectContext } from '../../project/context.js';
 import { readRegular, type Mutation } from '../../project/files.js';
@@ -8,14 +9,8 @@ export type Preset = { lines: string[] } | { presets: string[] };
 export type PresetCatalog = Record<string, Preset>;
 
 export const builtinPresets: PresetCatalog = {
-  nodiff: { lines: [
-    'package-lock.json text eol=lf -diff',
-    'npm-shrinkwrap.json text eol=lf -diff',
-    'pnpm-lock.yaml text eol=lf -diff',
-    'yarn.lock text eol=lf -diff',
-    'bun.lock text eol=lf -diff',
-  ] },
-  eol: { lines: ['* text=auto eol=lf'] },
+  nodiff: { lines: readFileSync(new URL('./templates/nodiff.txt', import.meta.url), 'utf8').trimEnd().split(/\r?\n/) },
+  eol: { lines: readFileSync(new URL('./templates/eol.txt', import.meta.url), 'utf8').trimEnd().split(/\r?\n/) },
 };
 
 const begin = '# BEGIN LEFTIUM GITATTRIBUTES';

@@ -4,7 +4,8 @@ import { mkdtemp, mkdir, readFile, writeFile, readdir, rm, stat, symlink, realpa
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test, type TestContext } from 'node:test';
-import { classify, reconcile, render, type state } from '../src/addons/license/License.gen.js';
+import { classify, reconcile, type state } from '../src/addons/license/License.gen.js';
+import { renderLicense } from '../src/addons/license/index.js';
 import { runAdd, type AddRequest } from '../src/orchestration/add.js';
 import { discover } from '../src/project/context.js';
 import { applyEdits } from '../src/project/files.js';
@@ -12,6 +13,7 @@ import { resolvePresets, type PresetCatalog } from '../src/addons/gitattributes/
 
 const cli = resolve('dist/src/cli/index.js');
 const defaults = { addon: 'license', author: 'Ada Lovelace', year: '2026' };
+const render = (author: string, year: string) => renderLicense('mit', { author, year });
 async function fixture(t: TestContext, files: Record<string, string> = {}): Promise<string> {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'leftium-')));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -413,5 +415,5 @@ test('invoking the CLI without a command prints help and succeeds', () => {
   const result = spawnSync(process.execPath, [cli], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Usage: leftium/);
-  assert.match(result.stdout, /add \[options\] <addon>/);
+  assert.match(result.stdout, /add \[options\] \[addon\]/);
 });

@@ -1,0 +1,5 @@
+package-lock.json text eol=lf -diff
+npm-shrinkwrap.json text eol=lf -diff
+pnpm-lock.yaml text eol=lf -diff
+yarn.lock text eol=lf -diff
+bun.lock text eol=lf -diff

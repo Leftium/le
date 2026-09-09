@@ -30,7 +30,7 @@
     "le": "dist/src/cli/index.js"
   },
   "scripts": {
-    "build": "rescript && tsc",
+    "build": "rescript && tsc && cp -R src/addons/license/templates dist/src/addons/license/ && cp -R src/addons/gitattributes/templates dist/src/addons/gitattributes/",
     "typecheck": "rescript && tsc --noEmit",
     "test": "pnpm build && node --test dist/tests/*.test.js",
     "prepack": "pnpm test",
