@@ -1,13 +1,9 @@
 import { Command } from 'commander';
-import { readFileSync } from 'node:fs';
 import * as prompts from '@clack/prompts';
 import { runAdd } from '../orchestration/add.js';
 import { runCreate } from '../orchestration/create.js';
 import type { Interaction, LicenseRequest } from '../addons/license/index.js';
-
-const { version } = JSON.parse(
-  readFileSync(new URL('../../../package.json', import.meta.url), 'utf8'),
-) as { version: string };
+import { version } from '../version.js';
 
 function terminalInteraction(): Interaction {
   return {

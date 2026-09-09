@@ -5,6 +5,7 @@ import { promisify } from 'node:util';
 import { add, create, officialAddons } from 'sv';
 import { runAdd } from './add.js';
 import { resolveNewLicenseRequest } from '../addons/license/index.js';
+import { version } from '../version.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -38,23 +39,29 @@ async function installDependencies(packageManager: 'npm' | 'pnpm', cwd: string):
   }
 }
 
-function shell(value: string): string {
-  return /^[A-Za-z0-9_./:-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`;
+export function shell(value: string): string {
+  return /^[A-Za-z0-9_./:@-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`;
 }
 
-function recipe(request: Required<Pick<CreateRequest, 'cwd' | 'template' | 'types' | 'addons' | 'packageManager' | 'install'>> & Pick<CreateRequest, 'author' | 'year'>): string {
+type ResolvedCreateRequest = Required<Pick<CreateRequest, 'cwd' | 'template' | 'types' | 'addons' | 'packageManager' | 'install'>> & Pick<CreateRequest, 'author' | 'year'>;
+
+export function recreationRecipeArgv(request: ResolvedCreateRequest): string[] {
   // A relative name makes the recorded command replayable from a fresh parent
   // directory instead of binding it to the original machine's absolute path.
   const launcher = request.packageManager === 'pnpm'
-    ? ['pnpm', 'dlx', 'leftium@0.1.0']
-    : ['npx', '--yes', 'leftium@0.1.0'];
-  const args = [...launcher, 'create', shell(basename(request.cwd)), `--template sv:${request.template}`, `--types ${request.types}`];
-  for (const addon of request.addons) args.push(`--add ${addon}`);
-  if (request.author) args.push(`--author ${shell(request.author)}`);
-  if (request.year) args.push(`--year ${shell(request.year)}`);
-  if (request.install) args.push(`--install ${request.packageManager}`);
+    ? ['pnpm', 'dlx', `leftium@${version}`]
+    : ['npx', '--yes', `leftium@${version}`];
+  const args = [...launcher, 'create', basename(request.cwd), '--template', `sv:${request.template}`, '--types', request.types];
+  for (const addon of request.addons) args.push('--add', addon);
+  if (request.author) args.push('--author', request.author);
+  if (request.year) args.push('--year', request.year);
+  if (request.install) args.push('--install', request.packageManager);
   else args.push('--no-install');
-  return args.join(' ');
+  return args;
+}
+
+export function renderRecipe(argv: readonly string[]): string {
+  return argv.map(shell).join(' ');
 }
 
 async function writeRecipe(cwd: string, command: string): Promise<void> {
@@ -104,7 +111,7 @@ export async function runCreate(input: CreateRequest): Promise<{ cwd: string; in
     const result = await runAdd({ addon: 'license', cwd, author: request.author, year: request.year });
     if (result.status !== 'applied' && result.status !== 'no-op') throw new Error(`License add-on failed: ${result.message}`);
   }
-  await writeRecipe(cwd, recipe(request));
+  await writeRecipe(cwd, renderRecipe(recreationRecipeArgv(request)));
   const warning = request.install ? await installDependencies(request.packageManager, cwd) : undefined;
   return { cwd, installed: request.install, warning };
 }

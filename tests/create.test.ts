@@ -1,9 +1,14 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, symlink, writeFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { mkdtemp, mkdir, readFile, readdir, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { runCreate } from '../src/orchestration/create.js';
+import { promisify } from 'node:util';
+import { recreationRecipeArgv, renderRecipe, runCreate } from '../src/orchestration/create.js';
+import { version } from '../src/version.js';
+
+const execFileAsync = promisify(execFile);
 
 async function destination(name: string): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), 'leftium-create-'));
@@ -17,7 +22,7 @@ test('creates a minimal Svelte project without installing dependencies', async (
   assert.match(await readFile(join(cwd, 'package.json'), 'utf8'), /"name": "minimal-app"/);
   const readme = await readFile(join(cwd, 'README.md'), 'utf8');
   assert.match(readme, /## Leftium recreation/);
-  assert.match(readme, /leftium@0\.1\.0 create/);
+  assert.match(readme, new RegExp(`leftium@${version.replaceAll('.', '\\.')} create`));
   assert.doesNotMatch(readme, /npx sv create my-app/);
 });
 
@@ -56,15 +61,38 @@ test('composes the official Prettier add-on and the Leftium license add-on', asy
   assert.match(await readFile(join(cwd, 'README.md'), 'utf8'), /--add prettier --add license/);
 });
 
-test('records the same portable recipe for a replay into a fresh destination', async () => {
+test('replays the recorded recipe through the packed local CLI', async () => {
   const first = await destination('replay-app');
-  const second = await destination('replay-app');
-  await runCreate({ cwd: first, install: false });
-  await runCreate({ cwd: second, install: false });
-  const command = /```sh\n([^\n]+)/.exec(await readFile(join(first, 'README.md'), 'utf8'))?.[1];
-  const replay = /```sh\n([^\n]+)/.exec(await readFile(join(second, 'README.md'), 'utf8'))?.[1];
-  assert.equal(command, replay);
-  assert.match(command ?? '', /^pnpm dlx leftium@0\.1\.0 create replay-app/);
-  assert.match(command ?? '', /--no-install$/);
-  assert.doesNotMatch(command ?? '', /--package-manager/);
+  await runCreate({ cwd: first, addons: ['prettier', 'license'], author: "Ada Lovelace's Workshop", year: '1843', install: false });
+  const command = /<!-- leftium:creation-recipe -->\n```sh\n([^\n]+)/.exec(await readFile(join(first, 'README.md'), 'utf8'))?.[1];
+  assert.ok(command);
+  const expectedArgv = recreationRecipeArgv({ cwd: first, template: 'minimal', types: 'typescript', addons: ['prettier', 'license'], author: "Ada Lovelace's Workshop", year: '1843', packageManager: 'pnpm', install: false });
+  assert.equal(renderRecipe(expectedArgv), command);
+  assert.deepEqual(await shellArgv(command), expectedArgv);
+  assert.match(command, /Ada Lovelace/);
+
+  const artifactDirectory = await mkdtemp(join(tmpdir(), 'leftium-pack-'));
+  await execFileAsync('pnpm', ['pack', '--ignore-scripts', '--pack-destination', artifactDirectory], { cwd: process.cwd() });
+  const artifact = join(artifactDirectory, (await readdir(artifactDirectory)).find(file => file.endsWith('.tgz'))!);
+  const replayArgv = await shellArgv(command);
+  replayArgv[2] = artifact;
+  const secondParent = await mkdtemp(join(tmpdir(), 'leftium-replay-'));
+  await execFileAsync(replayArgv[0]!, replayArgv.slice(1), { cwd: secondParent });
+  const second = join(secondParent, 'replay-app');
+
+  for (const project of [first, second]) {
+    assert.match(await readFile(join(project, 'src/routes/+page.svelte'), 'utf8'), /Welcome to SvelteKit/);
+    assert.match(await readFile(join(project, 'src/app.d.ts'), 'utf8'), /declare global/);
+    assert.match(await readFile(join(project, 'package.json'), 'utf8'), /"prettier"/);
+    assert.match(await readFile(join(project, 'LICENSE'), 'utf8'), /Copyright \(c\) 1843 Ada Lovelace's Workshop/);
+    const readme = await readFile(join(project, 'README.md'), 'utf8');
+    assert.equal((readme.match(/<!-- leftium:creation-recipe -->/g) ?? []).length, 1);
+    assert.doesNotMatch(readme, /npx sv create my-app/);
+    assert.match(readme, /--no-install$/m);
+  }
 });
+
+async function shellArgv(command: string): Promise<string[]> {
+  const { stdout } = await execFileAsync('sh', ['-c', `set -- ${command}; printf '%s\\0' "$@"`], { encoding: 'buffer' });
+  return stdout.toString().split('\0').filter(Boolean);
+}
