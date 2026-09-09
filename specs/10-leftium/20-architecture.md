@@ -2,20 +2,40 @@
 
 Leftium should use a small, `sv`-like add-on architecture without copying `sv` or creating a second Svelte ecosystem.
 
+## Implementation stack
+
+Use a TypeScript imperative shell around a ReScript functional core, running on Node.js with ESM. This is the preferred implementation direction; the `license` experiment and early creation spike must establish where the modeling benefits justify the interop and tooling cost.
+
+| Concern | Initial direction |
+| --- | --- |
+| Commands, arguments, options, and help | Commander |
+| Interactive prompts and terminal UX | `@clack/prompts` |
+| Svelte provider integration | `sv`, with public `@sveltejs/sv-utils` utilities where useful |
+| Deterministic domain calculations | ReScript |
+| Runtime validation | Valibot when concrete external inputs require validation |
+| Build | A small TypeScript/ESM setup coordinated with ReScript compilation; tsdown is a candidate, not an architectural commitment |
+
+Add each dependency only when implementation first requires it. The [sv package](https://github.com/sveltejs/cli/blob/main/packages/sv/package.json) uses Commander and Clack, and its [repository build](https://github.com/sveltejs/cli/blob/main/package.json) uses tsdown. Follow upstream choices when they fit, while checking compatibility against the selected release. Commander supplies a lightweight command hierarchy without imposing another plugin architecture alongside Leftium's future add-ons, creators, and mines. Do not introduce a heavyweight CLI/plugin framework such as oclif initially. Use `sv` as reference behavior and an upstream provider; do not fork it to inherit its CLI or rewrite it in ReScript.
+
 ## Shape
 
-Keep v0 in one package and repository:
+Keep v0 in one package and repository. A possible shape as implementation grows is:
 
 ```text
 le/
   src/
     cli/
-    creators/       # added for the Svelte creation milestone
+    orchestration/
+    creators/       # introduced by the early Svelte creation spike
+      sv.ts
     addons/
       license/
+        index.ts    # effectful adapter
+        License.res # pure calculations
       gitattributes/
       pages/
     project/
+    core/           # shared domain modules only when needed
   presets/
     license/
     gitattributes/
@@ -24,7 +44,11 @@ le/
 
 Do not split the CLI, core, add-ons, or presets into separate packages before concrete consumers require those boundaries.
 
-The first implementations need room to reveal the correct module boundaries. Splitting them earlier would turn provisional interfaces into package contracts without evidence that the separation is useful.
+The first implementations need room to reveal the correct module boundaries. Start smaller than this illustration and extract modules only when a real boundary appears; do not create empty directories or speculative `Result.res` and `Recipe.res` modules. Splitting packages earlier would turn provisional interfaces into contracts without evidence that the separation is useful.
+
+## Thin CLI
+
+Commander handlers translate user input into ordinary internal requests and delegate to orchestration such as `runAdd` and `runCreate`. Those functions must not depend on Commander. Interactive prompts, explicit CLI arguments, tests, and future agent/API callers use the same orchestration path. Keep business logic outside `.action()` callbacks and avoid elaborate wrapper layers solely to enforce the separation.
 
 ## Add-on boundary
 
@@ -38,9 +62,9 @@ resolve options and dependencies
   -> verify and report next steps
 ```
 
-The interface should support `dependsOn`-style dependencies, non-interactive options, and shared mutation utilities. The exact TypeScript API is provisional and should emerge from `license` and the early creation/composition spike before the remaining add-ons harden it.
+The interface should support `dependsOn`-style dependencies, non-interactive options, and shared mutation utilities. The exact internal API and its placement in TypeScript, ReScript, or both remain provisional. Let `license`, the early creation/composition spike, `gitattributes`, and `sv` composition establish the boundary. An add-on may begin as a TypeScript orchestration adapter calling ReScript calculations where useful; neither ReScript declarations nor a ReScript-specific interface are required.
 
-The intended shape is close to `sv`, generalized around detected project capabilities:
+This illustrative TypeScript shape is close to `sv`, generalized around detected project capabilities; it does not freeze the implementation language or API:
 
 ```ts
 defineAddon({
@@ -117,9 +141,33 @@ The shared lifecycle must allow several implementations:
 
 These are implementation choices inside one add-on model, not separate kinds of user-facing command.
 
-## Transform and orchestration boundaries
+## TypeScript shell and ReScript core
 
-Keep deterministic content transforms independently callable where practical. Filesystem access, prompts, package operations, and subprocesses belong to orchestration. This does not require another package, a frozen compatibility layer, or a public SDK.
+Use TypeScript for ecosystem-facing, effectful orchestration and ReScript for deterministic domain calculations:
+
+```text
+TypeScript: parse/prompt, discover, read
+  -> gathered domain data
+ReScript: classify, reconcile, decide
+  -> decisions and resolved data
+TypeScript: write, install, execute, report
+```
+
+TypeScript initially owns CLI parsing, prompts, filesystem/process/environment access, project and workspace discovery I/O, package-manager and subprocess execution, creator adapters, public `sv` calls and CLI delegation, applying mutations, and terminal reporting. ReScript receives the relevant observations as data rather than performing discovery itself.
+
+Strong core candidates include add-on state and conflict classification, reconciliation decisions, capability checks, preset composition, dependency ordering and cycle detection, result transitions, verification status, and request/recipe normalization. Use variants and exhaustive handling for mutually exclusive states. For example, current state might distinguish absent, correct, incomplete, conflict, and unsupported; execution and verification remain separate as specified above. These are modeling examples, not frozen type names or a new result contract. Keep pure calculations directly callable without filesystem or process setup.
+
+Keep interop coarse-grained: pass domain data to a calculation and return a decision or resolved data. Use ordinary ReScript-generated JavaScript imports and small explicit adapters. Preserve useful TypeScript type information at the boundary; ReScript's built-in [genType integration](https://rescript-lang.org/docs/manual/typescript-integration/) is an option to evaluate. Prefer one authoritative domain representation over independently maintained TS and ReScript models. Validate untrusted external inputs where needed before treating them as domain data; compile-time types do not perform runtime validation.
+
+Do not build extensive ReScript bindings for Commander, Clack, Node filesystem APIs, `sv`, or package managers merely for language purity. Mog is not an initial dependency; actual interop friction may inform it later. This split requires neither another package nor a public add-on SDK, and maximizing ReScript usage is not a goal.
+
+Use `license` as the first experiment: TypeScript resolves the target and reads license files; ReScript classifies state and determines the desired action; TypeScript writes, prompts when necessary, and reports. Results might express create, keep, replacement choice required, or conflict, with their exact representation settled by implementation. Supply inferred author/year and other environment-derived values as inputs so calculations stay deterministic.
+
+Before generalizing, evaluate glue volume, state-model clarity, testing, typed generated-JS imports, build/watch behavior, and debugging ergonomics. Keep more logic in TypeScript where the split proves cumbersome. The early [creation spike](35-create.md#implementation-gates-and-sequence) is the second experiment for a richer normalized request/recipe model; use both experiments to refine the boundary before the remaining add-ons harden it.
+
+## Boundary verification
+
+Test implemented pure ReScript calculations directly for classification, reconciliation, dependency graphs, preset composition, recipe normalization, and result transitions as those concerns appear. Include a small typed TS-to-ReScript call in the first experiment to establish that generated imports preserve the intended contract. Integration tests exercise the TypeScript shell: Commander input translation, filesystem effects, the `sv` provider, installation, README recipe ownership, and workspace targeting. Exercise orchestration without constructing Commander commands as well.
 
 Shared fixtures should cover regeneration of edited generated output, preservation of custom input outside that boundary, ambiguous adoption, and operation with staged and unstaged user changes. Verify that Leftium-owned operations leave the index untouched.
 

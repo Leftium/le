@@ -85,9 +85,9 @@ The separate [GitHub Pages migration plan](../20-github-pages-migration/10-plan.
 
 ## Implementation order
 
-1. Build the CLI shell, directory target context, change reporting, and minimal add-on boundary.
-2. Implement `license` to establish file creation and conflict handling, including plain directories without Git or a package manifest.
-3. Run a vertical creation spike: `sv:minimal`, Leftium `license`, official Prettier, one coordinated install, README recipe, and replay in a fresh destination. Use three representative round-trip cases to settle flags and provider boundaries before freezing the internal API.
+1. Build the minimal TypeScript/ESM CLI shell with Commander and Clack, directory target context, change reporting, and a provisional add-on boundary. Keep orchestration independent of Commander and add dependencies as needed.
+2. Implement `license` to establish file creation and conflict handling, including plain directories without Git or a package manifest. Use it to evaluate the [TypeScript shell and ReScript core](20-architecture.md#typescript-shell-and-rescript-core): assess glue volume, state modeling, testing, typed generated-JS imports, build/watch behavior, and debugging before generalizing the split. Keep more implementation in TypeScript where the cost outweighs the benefit.
+3. Run a vertical creation spike: `sv:minimal`, Leftium `license`, official Prettier, one coordinated install, README recipe, and replay in a fresh destination. Use three representative round-trip cases to settle flags and provider boundaries before freezing the internal API. Evaluate request/recipe normalization as the second ReScript case and refine language boundaries from both experiments before the remaining add-ons harden them.
 4. Implement `gitattributes`, first comparing native `-diff` with a custom driver in a disposable Git fixture, then establishing preset composition and regeneration.
 5. Harden standalone `sv` delegation and execution-result handling using the spike's findings.
 6. Implement the narrow SvelteKit Pages slice, define and release its reusable workflow, then validate one consumer adoption.

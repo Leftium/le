@@ -71,6 +71,8 @@ For a preset whose content is not fixed by the pinned Leftium release, record im
 4. Establish README section identification and implement the recipe ownership contract in the early Svelte creation spike. Prefer the public API path without an upstream recipe; cover replacement only when a supported integration actually emits one. Preserve unrelated upstream content.
 5. Verify recreation in a fresh destination and failure behavior before adding other creators.
 
+After the `license` language-boundary experiment, use this early spike to evaluate a richer ReScript creation request/recipe model. Commander arguments and Clack prompt answers must converge into the same structured request; ReScript may own its normalized representation and deterministic calculations where ergonomic. TypeScript continues to own `sv` create/add calls, filesystem changes, installation, README mutation, and process execution. Recipe command rendering may stay in TypeScript when quoting or platform concerns make that the natural boundary. A ReScript domain model does not require every recipe-related concern to move with it. Evaluate the split using the [architecture criteria](20-architecture.md#typescript-shell-and-rescript-core), while preserving the executable round-trip gate above.
+
 API signatures, exact flags, and README markers are implementation decisions at these gates. A public third-party creator SDK is not required.
 
 ## Acceptance
