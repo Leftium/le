@@ -74,7 +74,6 @@ jobs:
           set -euo pipefail
 
           node -e 'const [major, minor, patch] = process.argv[1].split(".").map(Number); if (major < 11 || (major === 11 && (minor < 5 || (minor === 5 && patch < 1)))) { console.error(`npm 11.5.1 or newer is required for trusted publishing; found ${process.argv[1]}`); process.exit(1) }' "$(npm --version)"
-          npm pack --dry-run --ignore-scripts >/dev/null
 
       - name: Check npm for published version
         id: npm_version
