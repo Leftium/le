@@ -25,9 +25,9 @@ export function createCommand(): Command {
     .addHelpText('before', `leftium ${version}\n\n`)
     .action(() => program.outputHelp());
   program.command('add')
-    .argument('<addon>', 'add-on to apply (currently license)')
+    .argument('<addon>', 'add-on to apply (license or gitattributes)')
     .option('-C, --cwd <dir>', 'target directory')
-    .option('--preset <name>', 'license preset', 'mit')
+    .option('--preset <name>', 'add-on preset (repeatable)', (value, previous: string[] = []) => [...previous, value], [])
     .option('--author <name>', 'copyright holder')
     .option('--year <year>', 'copyright year or range')
     .option('--force', 'replace conflicting license content and package license metadata')

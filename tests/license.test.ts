@@ -8,6 +8,7 @@ import { classify, reconcile, render, type state } from '../src/addons/license/L
 import { runAdd, type AddRequest } from '../src/orchestration/add.js';
 import { discover } from '../src/project/context.js';
 import { applyEdits } from '../src/project/files.js';
+import { resolvePresets, type PresetCatalog } from '../src/addons/gitattributes/index.js';
 
 const cli = resolve('dist/src/cli/index.js');
 const defaults = { addon: 'license', author: 'Ada Lovelace', year: '2026' };
@@ -192,6 +193,93 @@ test('invalid inputs, presets, and add-ons fail before writes', async t => {
     assert.deepEqual(result.changed, []);
   }
   assert.deepEqual(await readdir(root), []);
+});
+
+test('gitattributes defaults to nodiff, composes ordered presets, and deduplicates requests', async t => {
+  const root = await fixture(t);
+  assert.equal((await runAdd({ addon: 'gitattributes', cwd: root })).status, 'applied');
+  const defaultText = await readFile(join(root, '.gitattributes'), 'utf8');
+  assert.match(defaultText, /Selected presets: nodiff/);
+  assert.match(defaultText, /package-lock\.json text eol=lf -diff/);
+
+  const composed = await fixture(t);
+  assert.equal((await runAdd({ addon: 'gitattributes', cwd: composed, preset: ['nodiff', 'eol', 'nodiff'] })).status, 'applied');
+  const text = await readFile(join(composed, '.gitattributes'), 'utf8');
+  assert.match(text, /Selected presets: nodiff, eol/);
+  assert.ok(text.indexOf('package-lock.json') < text.indexOf('* text=auto eol=lf'));
+  assert.equal((text.match(/package-lock\.json/g) ?? []).length, 1);
+  assert.equal((await runAdd({ addon: 'gitattributes', cwd: composed, preset: ['nodiff', 'eol'] })).status, 'no-op');
+});
+
+test('CLI defaults gitattributes to nodiff when no --preset is supplied', async t => {
+  const root = await fixture(t);
+  const result = spawnSync(process.execPath, [cli, 'add', 'gitattributes', '-C', root, '--non-interactive'], { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(await readFile(join(root, '.gitattributes'), 'utf8'), /package-lock\.json text eol=lf -diff/);
+});
+
+test('gitattributes resolver rejects unknown names and cycles before mutation', async t => {
+  const root = await fixture(t);
+  const unknown = await runAdd({ addon: 'gitattributes', cwd: root, preset: 'missing' });
+  assert.equal(unknown.status, 'unsupported');
+  assert.deepEqual(await readdir(root), []);
+  const cyclic: PresetCatalog = { a: { presets: ['b'] }, b: { presets: ['a'] } };
+  assert.throws(() => resolvePresets(['a'], cyclic), /cycle/);
+});
+
+test('gitattributes preserves user rules, regenerates its block, and appends native overrides', async t => {
+  const root = await fixture(t, {
+    '.gitattributes': '*.png binary\n',
+    '.leftium/gitattributes.override': 'vendor.lock -diff\n# Keep this comment\n',
+  });
+  assert.equal((await runAdd({ addon: 'gitattributes', cwd: root, preset: 'eol' })).status, 'applied');
+  const path = join(root, '.gitattributes');
+  const initial = await readFile(path, 'utf8');
+  assert.match(initial, /^\*\.png binary\n\n# BEGIN LEFTIUM GITATTRIBUTES/m);
+  assert.ok(initial.indexOf('* text=auto eol=lf') < initial.indexOf('vendor.lock -diff'));
+  await writeFile(path, initial.replace('* text=auto eol=lf', 'edited managed content'));
+  assert.equal((await runAdd({ addon: 'gitattributes', cwd: root, preset: 'eol' })).status, 'applied');
+  const regenerated = await readFile(path, 'utf8');
+  assert.match(regenerated, /\* text=auto eol=lf/);
+  assert.doesNotMatch(regenerated, /edited managed content/);
+  assert.match(regenerated, /vendor\.lock -diff\n# Keep this comment/);
+});
+
+test('gitattributes preserves CRLF user content and override bytes', async t => {
+  const root = await fixture(t, {
+    '.gitattributes': '*.png binary\r\n',
+    '.leftium/gitattributes.override': 'vendor.lock -diff\r\n',
+  });
+  assert.equal((await runAdd({ addon: 'gitattributes', cwd: root, preset: 'eol' })).status, 'applied');
+  const text = await readFile(join(root, '.gitattributes'), 'utf8');
+  assert.match(text, /^\*\.png binary\r\n\r\n# BEGIN LEFTIUM GITATTRIBUTES/m);
+  assert.match(text, /vendor\.lock -diff\r\n# END LEFTIUM GITATTRIBUTES/);
+});
+
+test('gitattributes refuses malformed markers and conflicting user rules before writing', async t => {
+  for (const text of [
+    '# BEGIN LEFTIUM GITATTRIBUTES\nuser rule\n',
+    '# BEGIN LEFTIUM GITATTRIBUTES\n# END LEFTIUM GITATTRIBUTES\n# BEGIN LEFTIUM GITATTRIBUTES\n# END LEFTIUM GITATTRIBUTES\n',
+    'package-lock.json diff\n',
+  ]) {
+    const root = await fixture(t, { '.gitattributes': text });
+    const result = await runAdd({ addon: 'gitattributes', cwd: root, preset: 'nodiff' });
+    assert.equal(result.status, 'conflict');
+    assert.equal(await readFile(join(root, '.gitattributes'), 'utf8'), text);
+  }
+});
+
+test('gitattributes uses the Git root when present and the selected plain directory otherwise', async t => {
+  const repository = await fixture(t, { 'nested/project/keep': 'x' });
+  git(repository, 'init', '-q');
+  assert.equal((await runAdd({ addon: 'gitattributes', cwd: join(repository, 'nested/project') })).status, 'applied');
+  await stat(join(repository, '.gitattributes'));
+  await assert.rejects(stat(join(repository, 'nested/project/.gitattributes')));
+
+  const plain = await fixture(t, { 'nested/keep': 'x' });
+  assert.equal((await runAdd({ addon: 'gitattributes', cwd: join(plain, 'nested'), preset: 'eol' })).status, 'applied');
+  await stat(join(plain, 'nested/.gitattributes'));
+  await assert.rejects(stat(join(plain, '.gitattributes')));
 });
 
 test('workspace ancestor license requires a package-level choice; force is insufficient', async t => {

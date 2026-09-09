@@ -4,10 +4,11 @@ import { parseTree } from 'jsonc-parser';
 import { classify, reconcile, render } from './License.gen.js';
 import { gitValue, type ProjectContext } from '../../project/context.js';
 import { readRegular, type Mutation } from '../../project/files.js';
+import { Stopped } from '../../orchestration/stopped.js';
 
 export type LicenseRequest = {
   cwd?: string;
-  preset?: string;
+  preset?: string | string[];
   author?: string;
   year?: string;
   force?: boolean;
@@ -18,9 +19,6 @@ export type Interaction = {
   text(message: string): Promise<string | undefined>;
   confirm(message: string): Promise<boolean | undefined>;
 };
-export class Stopped extends Error {
-  constructor(public status: 'conflict' | 'unsupported' | 'canceled', message: string) { super(message); }
-}
 
 export async function licenseFiles(directory: string): Promise<{ path: string; text: string }[]> {
   const names = (await readdir(directory)).filter(name => /^(licen[sc]e|copying)(\.(md|txt|markdown))?$/i.test(name)).sort();
@@ -74,7 +72,8 @@ function updateLicenseMetadata(text: string): string {
 }
 
 export async function planLicense(context: ProjectContext, request: LicenseRequest, interaction?: Interaction): Promise<Mutation[]> {
-  if (request.preset !== undefined && request.preset !== 'mit') throw new Stopped('unsupported', 'Only --preset mit is supported.');
+  const presets = request.preset === undefined ? [] : Array.isArray(request.preset) ? request.preset : [request.preset];
+  if (presets.some(preset => preset !== 'mit') || presets.length > 1) throw new Stopped('unsupported', 'Only one --preset mit is supported.');
   const files = await licenseFiles(context.target);
   if (request.packageLicense && context.target !== context.packageRoot) {
     throw new Stopped('conflict', 'Select a package directory containing package.json with -C when using --package-license.');

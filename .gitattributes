@@ -1,0 +1,10 @@
+# BEGIN LEFTIUM GITATTRIBUTES
+# Managed by Leftium. Selected presets: nodiff.
+# Regenerate: le add gitattributes --preset nodiff
+# Put custom rules outside this block or in .leftium/gitattributes.override.
+package-lock.json text eol=lf -diff
+npm-shrinkwrap.json text eol=lf -diff
+pnpm-lock.yaml text eol=lf -diff
+yarn.lock text eol=lf -diff
+bun.lock text eol=lf -diff
+# END LEFTIUM GITATTRIBUTES

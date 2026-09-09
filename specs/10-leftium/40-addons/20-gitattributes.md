@@ -25,6 +25,14 @@ The root here is the repository root, detected from Git or explicitly selected a
 
 Before choosing a representation, compare `package-lock.json text eol=lf -diff` with a custom `diff=nodiff` driver in a disposable Git fixture. Inspect ordinary diff output and the intended review tools, text normalization, clone portability, and repeated application.
 
+### Experiment: 2026-09-09
+
+A disposable repository committed a LF `package-lock.json`, then changed it with CRLF working-tree content. Native `-diff` produced Git's `Binary file modified (old: 45 B, new: 64 B)` summary in both ordinary and staged diff. A `diff=nodiff` driver configured locally with an empty `textconv` produced only `Diff skipped: package-lock.json` in both cases.
+
+Both forms retained `text eol=lf`: the committed and freshly cloned file used LF. Recheckout did not rewrite an already-present CRLF working-tree file in this fixture, so the attribute does not promise a forced working-tree rewrite. The custom driver's local `diff.nodiff.textconv` setting was absent after cloning; it must be configured per clone, although repeat configuration is idempotent.
+
+The custom wording is not a meaningful review advantage over Git's native binary-change summary. v0 therefore uses native `-diff`, which suppresses textual hunks, retains text normalization, needs no Git-local configuration, and works in plain directories.
+
 Prefer native `-diff` if its binary-change summary provides acceptable suppression of textual hunks. Retain a custom driver only for a demonstrated presentation requirement that native attributes cannot meet. Record the observed behavior and selected representation in this spec before shipping; a custom driver is not an architectural requirement.
 
 If a custom driver is selected, establish only project-local Git settings, preserve existing custom drivers or report a conflict, and document setup after cloning. Detect missing Git prerequisites before avoidable mutation. File generation without Git remains possible for presets that do not need local settings. Do not claim complete setup if required settings or verification failed.
