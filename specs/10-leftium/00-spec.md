@@ -1,7 +1,7 @@
 # Leftium project orchestrator - spec v2
 
 **Date:** 2026-09-08
-**Status:** Draft v2; initial CLI and license implementation in progress
+**Status:** Draft v2; license released, Svelte creation spike in progress
 **Package:** `leftium`
 **Commands:** `leftium`, `le`
 **Repository:** `Leftium/le`

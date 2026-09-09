@@ -75,6 +75,20 @@ After the `license` language-boundary experiment, use this early spike to evalua
 
 API signatures, exact flags, and README markers are implementation decisions at these gates. A public third-party creator SDK is not required.
 
+## Spike checkpoint: 2026-09-09
+
+The first Svelte creation implementation is intentionally narrow. It is evidence for the next design decisions, not the final creator interface.
+
+- `sv@0.17.0` is pinned as a runtime dependency. Its public `create({ cwd, name, template, types })` API is synchronous and does not install dependencies. Its public `add({ addons, cwd, options, packageManager })` API applies official add-ons without installing. The supported template identifiers include `minimal`, and `officialAddons.prettier` has no configured options in this release.
+- `le create <directory>` currently supports `sv:minimal`, `typescript`, `checkjs`, and `none`; `--add prettier`; `--add license`; `--install npm|pnpm`; and `--no-install`. It rejects a nonempty or symbolic-link destination before scaffolding and resolves fresh-license author/year inputs before writes.
+- Creation uses `sv`'s public APIs, applies the existing Leftium license operation, then performs one final install. For pnpm's `ERR_PNPM_IGNORED_BUILDS`, creation succeeds with an explicit `pnpm approve-builds` recovery warning, matching `sv`'s user-facing treatment. Other installation failures remain failures with partial output reported.
+- The generated README's identified `sv` setup section is replaced with one marked Leftium recreation section. The recipe records the resolved template, language, add-ons, license values, and explicit install policy. It does not retain the competing `sv create` command.
+- Fixtures cover minimal creation, destination rejection, official Prettier plus Leftium license composition, no-install behavior, and portable recipe rendering. The configured-add-on case and an end-to-end replay against a released Leftium version remain open before the recipe contract is complete.
+
+TypeScript remains the implementation language for the creation request, `sv` calls, installation, README edits, and recipe rendering. This spike did not identify a deterministic creation calculation with enough variant or type-model value to justify a new ReScript boundary. Revisit that decision after the configured add-on case and `gitattributes`; do not generalize the current creation code into a creator or add-on framework yet.
+
+The recipe currently targets `leftium@0.1.0` as the intended release identity. That npm release predates `create`, so the command is not yet replayable from npm. This is accepted temporary release state, not evidence that the versioned replay gate is complete.
+
 ## Acceptance
 
 - Interactive and explicit equivalent inputs yield equivalent resolved plans.
