@@ -1,264 +1,368 @@
-# Agent handoff orchestration
+# Agent-assisted workflow synchronization
 
 **Status:** Draft design for later integration into the Leftium specification and implementation.
-**Scope:** Provider-neutral handoff mechanics, local handoff state, WIP recovery, companion agent instructions, and arbitrary multi-participant workflows.
+**Scope:** Agent-safe Git commits, local/shared project synchronization, workflow-state inference, WIP recovery, and companion agent instructions.
 
 ## Motivation
 
-Agent-assisted development often crosses execution environments. One participant may plan through a hosted GitHub integration, another may implement in a local checkout with stronger filesystem and test access, and another may independently review or verify the result. The same participant may also hand work to a fresh session of itself after context, token, usage, or process limits interrupt work.
+Agent-assisted development often alternates between two views of the same project:
 
-Today each participant repeatedly rediscovers Git, branch, pull-request, worktree, and workflow state and then performs a series of mechanical handoff operations one tool call at a time.
+- **local state**: a worktree, index, local branches, local tools, builds, tests, and unpushed work
+- **shared state**: remote Git branches and commits plus GitHub pull-request metadata, reviews, and tracked workflow artifacts
 
-Leftium should make these transitions deterministic, idempotent, inspectable, and recoverable without deciding the engineering work for any participant.
+Different agents or humans may consume either view at different times. The identity of the next agent is usually less important than making the project state safe, current, and understandable from whichever side is being used.
 
-The first motivating workflow uses ChatGPT and T3, but the core model must not assume exactly two agents, exactly two workflow roles, or even two distinct participants. It must support one-participant session rollover, ordinary two-participant handoff, three-or-more-participant chains, parallel assist work, and other providers or harnesses such as Codex, OpenCode, ChatGPT Work, or future tools.
+The first motivating workflow used ChatGPT for planning/review and T3 for local implementation. That exposed useful mechanics, but those product names are not the architectural boundary. A project may use one agent, two agents, several agents, fresh sessions of the same harness, or humans mixed with agents.
 
-## Design principles
+Leftium should make the local/shared boundary deterministic, inspectable, idempotent, and recoverable. Any capable agent should be able to examine the shared project state and infer the current workflow state and next required action without relying on a private handoff message from the previous agent.
 
-1. **Model transitions between participants, not a fixed pair of roles or brands.** A handoff is a directed transition from one participant to another. Source and destination may be the same participant.
-2. **Keep workflow meaning project-defined.** Labels such as planning, implementation, review, verification, or deployment may be useful phase metadata or project policy, but they are not a closed set built into the handoff engine.
-3. **Describe participants by profile and capabilities.** Harness/provider names such as `t3`, `chatgpt`, `codex`, and `opencode` are profiles that help derive mechanics; they do not define the workflow topology.
-4. **Keep intent in agent policy and mechanics in the CLI.** Agent instructions decide when a handoff is appropriate, who owns decisions, and what requires approval. Leftium performs deterministic Git/GitHub checks and permitted mutations.
-5. **Do not hide partial effects.** Every operation reports what succeeded, what was already satisfied, what failed, what was skipped, and the exact manual follow-up when known.
-6. **Rerunning is the normal recovery path.** Operations are idempotent where possible and tolerate an earlier run stopping after some effects succeeded.
-7. **Do not make incorporation decisions.** When one or more participants create side-branch work, the receiving participant or project policy decides whether to cherry-pick, squash, reproduce, partially use, or discard it.
-8. **WIP is observed recovery state.** Leftium normally does not create WIP commits. A user may create one manually when an agent is interrupted by token, usage, process, or session limits.
-9. **Local coordination state stays local.** Handoff metadata lives under an ignored repository-local directory and must not become project history.
+## Core model
 
-## Participants, transitions, profiles, and phases
-
-A **participant** is one execution context taking part in the workflow. It may be:
-
-- a local coding harness
-- a hosted assistant with GitHub access
-- a review agent
-- a human operating the CLI
-- a fresh session of the same harness that previously held the work
-
-A **profile** describes useful mechanics or capabilities of a participant, such as local-worktree access, GitHub PR access, or a preferred convenience alias. Initial built-in profiles may include `t3`, `chatgpt`, `codex`, and `opencode`, but profiles are not workflow roles.
-
-A **handoff** is a directed transition:
+The fundamental synchronization boundary is:
 
 ```text
-participant A -> participant B
+local project state <-> shared GitHub/project state
 ```
 
-The source and destination may be identical:
+Shared state may include:
+
+- remote branch and commit graph
+- pull-request head/base and draft/ready state
+- pull-request description and review state
+- tracked project workflow files such as `AGENTS.md`, `MILESTONE.md`, or project-specific specs
+- assist branches or other explicitly shared Git artifacts
+
+A particular agent is a consumer or producer of this state, not a permanent owner of one side.
+
+### Workflow roles belong to work, not agents
+
+Roles such as planning, implementation, fixes, review, verification, deployment, or merge describe **workflow stages or tasks**. They are not permanently assigned to ChatGPT, T3, Codex, or another harness.
+
+Any suitable agent may perform any role unless project policy imposes a constraint. The user chooses which agent receives the next task.
+
+For example:
 
 ```text
-codex session 1 -> codex session 2
+no milestone PR
+  -> next work: planning
+
+draft milestone PR
+  -> next work: implementation/fixes
+
+ready milestone PR
+  -> next work: independent review
+
+review requests changes
+  -> next work: fixes
+
+clean review
+  -> next action: human merge
 ```
 
-This is still useful as a deterministic checkpoint, state validation, and context/session rollover.
+A project may define different stages or omit these entirely. Leftium should not hard-code a closed role enumeration.
 
-A workflow may contain any number of transitions:
+Some stages may carry relational constraints rather than agent assignments. For example, `independent review` may require a participant or session independent from the implementation that produced the change. Such constraints should produce warnings when violated, while explicit user direction may override project policy when appropriate.
 
-```text
-chatgpt -> t3 -> codex -> chatgpt
-```
+### Repository state should be sufficient to resume
 
-or branching collaboration:
+At the start of work, an agent should be able to inspect the repository and shared state and determine:
 
-```text
-                 -> agent B assist branch
-checkpoint/WIP -
-                 -> agent C assist branch
-                        |
-                        v
-                    agent D
-```
+- what workflow state the project is currently in
+- what work is complete or incomplete
+- what action or stage comes next
+- whether the current environment has the required capabilities
+- whether a workflow constraint such as independent review applies
 
-No participant count, ordering, or topology is implied by the core model.
+A previous agent may provide a useful summary, but that summary is not authoritative. Git, GitHub, and tracked project policy are the primary evidence.
 
-A handoff may carry an optional **phase** or **purpose** label such as `plan`, `implement`, `review`, or `verify`. Projects may use these labels to express ownership rules, but Leftium should not make a fixed role enumeration part of its fundamental API.
+The user remains responsible for choosing which agent or human performs the next action.
 
-A provisional generic command surface is:
+## Candidate command family
+
+The command namespace is intentionally unresolved. `agent` is a current candidate because the operations exist to make agent-assisted development safer, but this spec does not require it.
+
+Illustrative commands use the provisional namespace:
 
 ```sh
-npx leftium handoff --to t3
-npx leftium handoff --from t3 --to chatgpt
-npx leftium handoff --from chatgpt --to codex --phase implement
-npx leftium handoff --from codex --to codex --phase continue
+le agent status
+le agent commit -m "fix(foo): repair thing" -- src/foo.ts src/foo.test.ts
+le agent sync --from shared
+le agent sync --to shared
 ```
 
-When the source can be derived safely from local handoff state or an explicit participant profile, `--from` may be optional.
+The local project agent should evaluate whether `agent`, a different namespace, or selected root commands best fit Leftium's existing CLI before implementation.
 
-Destination convenience shims may map directly to the same orchestration:
+The important API concepts are `status`, safe commit construction, and bidirectional local/shared synchronization; the exact spelling is secondary.
+
+## Status and next-action inference
+
+A read-only status operation should compare the relevant local and shared evidence and report the current workflow state.
+
+Conceptually:
+
+```text
+local Git/worktree/index
+        +
+remote Git/PR state
+        +
+tracked project workflow policy
+        |
+        v
+current state
+next required action
+constraints/capabilities
+```
+
+Example:
+
+```text
+Local:
+  milestone/05-runtime @ def456
+  clean
+
+Shared:
+  PR #5 ready
+  head def456
+
+Workflow:
+  implementation published
+
+Next:
+  independent review
+
+Constraint:
+  reviewer should be independent of the implementation session
+```
+
+Another agent should be able to derive the same conclusion from the same state.
+
+The first implementation does not need a universal workflow engine. Project-specific files such as `AGENTS.md` and `MILESTONE.md` may define the relevant state rules, while Leftium provides reliable Git/GitHub observations and a place for machine-readable support only when a concrete consumer requires it.
+
+## Safe commit construction
+
+The existing `approved-git-commit` helper demonstrates a reusable agent-safe Git primitive. Its important properties are broader than the original Vee workflow:
+
+- explicit file/path approval boundary
+- preservation of unrelated staged changes
+- Conventional Commit subject validation
+- explicit amend semantics
+- amendment requires every file already changed by HEAD to be named
+- merge commits require all staged/resolved-conflict files to be named
+- resulting commit SHA is returned directly
+
+This behavior should become a Leftium operation rather than remain a machine-specific dotfiles dependency.
+
+Illustrative shape:
 
 ```sh
-t3-handoff
-chatgpt-handoff
+le agent commit \
+  -m "fix(foo): repair thing" \
+  -m "Preserve existing behavior while repairing the edge case." \
+  -- src/foo.ts src/foo.test.ts
 ```
 
-A shim means "handoff to this participant/profile"; it does not define a separate implementation.
+The CLI owns deterministic commit mechanics. It does **not** determine whether the user approved the commit. Approval is an agent-policy concern expressed through `AGENTS.md` or harness-level instructions.
 
-The exact command grammar is not frozen by this draft. The internal API should represent arbitrary source and destination participants plus optional workflow metadata rather than separate `handoffToT3` or `handoffToChatGPT` paths.
+The existing `approved-git-commit` command may remain as a compatibility shim over the Leftium implementation.
 
-## Capability-driven mechanics
+### Commit is not implicitly required by synchronization
 
-Different transitions require different mechanics. The CLI should derive a handoff plan from the current repository state, project policy, and the relevant participant capabilities instead of mapping every participant name to one hard-coded workflow.
+A synchronization or session change does not automatically imply a commit.
 
 Examples:
 
-- A hosted participant handing to a local-worktree participant may require fetch, checkout/fast-forward, worktree/index inspection, WIP detection, and assist-branch discovery.
-- A local participant handing to a hosted GitHub participant may require push, PR-body update, draft/ready transition, and remote verification.
-- A local participant handing to another local harness on the same checkout may require only state validation and a local handoff record.
-- A participant handing to a fresh session of itself may require no Git mutation at all; the value is a validated checkpoint and concise continuation state.
-- A third participant joining as an assistant may create an assist branch from the current checkpoint without becoming the canonical owner of the work branch.
+- a fresh session using the same local worktree may continue dirty local work without a commit
+- local work that must become visible to a hosted GitHub-only agent may need committed and pushed state
+- remote/shared work being synchronized locally needs no new commit
+- a manually created WIP checkpoint may be the appropriate recovery artifact after an interrupted agent
 
-Profiles may provide defaults for capabilities and convenience wording. Project or invocation data may override only where safe and explicit. Do not introduce a heavyweight provider plugin protocol before concrete integrations require it.
+The sync/status operation should report when transferable committed state is required instead of silently creating commits.
 
-## Local handoff state
+## Synchronization from shared state
 
-Use a repository-local `.handoff/` directory for transient coordination metadata. It must be ignored by Git.
+A shared-to-local operation prepares the local project from the Git/GitHub state.
 
-Possible contents are illustrative, not a frozen schema:
+Illustrative command:
 
-```text
-.handoff/
-  state.json
-  handoff.json
-  pr-body.md
+```sh
+le agent sync --from shared
 ```
 
-The state may record:
+Possible checks/actions:
 
-- repository identity
-- pull-request number when applicable
-- base and head branch
-- expected remote head SHA
-- detected WIP SHA and parent
-- source and destination participant/profile identifiers
-- optional phase/purpose
-- discovered assist branches and their tips
-- completed handoff steps needed for idempotent recovery
-- prior transitions useful for safe continuation
+1. discover the Git repository and relevant pull request when applicable
+2. fetch the remote
+3. identify the canonical branch and PR relationship
+4. inspect local worktree and index without discarding, unstaging, or overwriting user work
+5. checkout or fast-forward only when safe and necessary
+6. verify local HEAD, remote branch head, and PR head where applicable
+7. locate tracked workflow contracts such as `AGENTS.md` and `MILESTONE.md`
+8. detect an exact WIP tip
+9. discover and verify assist branches tied to that WIP
+10. report current workflow state and inferred next action
 
-Do not store secrets or credentials. Do not require this directory for read-only inspection when the necessary state can be reconstructed safely.
+A successful result should be trustworthy enough that the receiving agent does not repeat equivalent Git/GitHub synchronization checks merely to verify Leftium's verification.
 
-If `.handoff/` or its contents are tracked, a mutating handoff must stop and report the violation. The exact mechanism used to ensure the directory is ignored is an implementation decision; see the companion policy section.
+## Synchronization to shared state
 
-Handoff state should describe the current transition and evidence needed for safe recovery, not become an authoritative workflow database. Git, GitHub, and native project files remain source evidence where available.
+A local-to-shared operation publishes enough local state for GitHub/shared consumers to see the current project state.
+
+Illustrative command:
+
+```sh
+le agent sync --to shared
+```
+
+Possible checks/actions:
+
+1. validate repository, branch, expected remote state, and PR identity
+2. verify whether uncommitted local work prevents complete publication
+3. push normally when local history is a safe fast-forward
+4. support narrowly guarded replacement of a known WIP checkpoint
+5. update PR description or workflow metadata when required by project policy
+6. change draft/ready state only when the workflow calls for it
+7. verify local HEAD, remote head, PR head, and relevant PR state
+8. report the resulting workflow state and inferred next action
+
+The operation does not choose the next agent. After synchronization, the user may open ChatGPT, T3, Codex, another harness, or continue manually. Any of them should be able to inspect the shared state and determine the next work.
+
+## Destination-specific hints
+
+A future destination hint such as:
+
+```sh
+le agent sync --to shared --for chatgpt
+```
+
+may be useful if a consumer has concrete capability requirements. For example, a GitHub-only hosted consumer requires all necessary work to be visible remotely.
+
+Such a hint is optional transport/setup information. It must not mean "assign the next workflow role to ChatGPT."
+
+Do not introduce provider-specific paths until a concrete capability difference requires them.
 
 ## WIP recovery
 
-A WIP commit is a user-created recovery checkpoint. The initial recognition rule is deliberately narrow:
+A WIP commit is a user-created recovery checkpoint, commonly created manually when an agent runs out of tokens, usage, process lifetime, or session context.
+
+Recognition is deliberately narrow:
 
 - only the current relevant canonical branch tip receives special treatment
 - its commit subject must be exactly `WIP`
 - historical commits containing "WIP" elsewhere do not acquire special semantics
 
-Leftium does not normally create this commit.
+Leftium normally does not create WIP commits.
 
-When a participant receives work whose canonical branch tip is exact `WIP`, the CLI records its SHA and parent. This establishes a checkpoint from which assist work can be related and against which later intentional history replacement can be guarded.
-
-If no exact WIP tip exists, the handoff follows the ordinary path for the source/destination capabilities.
+When synchronizing from shared state, an exact WIP tip is reported as a recoverable checkpoint. When synchronizing finished work to shared state, a previously established WIP may be replaced only under the guarded rules below.
 
 ### Assist branches
 
-Any participant that should not modify the canonical branch may create commits on a side branch rooted at the exact WIP checkpoint.
+A hosted or otherwise separate worker may create useful work without modifying the canonical WIP branch. Such work may live on a side branch rooted at the exact WIP checkpoint.
 
-A scalable candidate naming convention is:
+Candidate naming:
 
 ```text
-assist/<participant-or-profile>/wip-<short-wip-sha>
+assist/<source>/wip-<short-wip-sha>
 ```
 
-For example:
+Examples:
 
 ```text
 assist/chatgpt/wip-2f290fc
 assist/codex/wip-2f290fc
 ```
 
-The simpler earlier form `assist/wip-<short-wip-sha>` may be accepted for compatibility. Exact branch grammar remains provisional. The relationship to an exact WIP SHA must be mechanically verifiable.
+The source component is descriptive, not a role assignment. There may be zero, one, or several matching assist branches.
 
-There may be zero, one, or several matching assist branches. The assist commits themselves do not require special commit subjects or tags.
+When synchronizing shared state locally, Leftium should:
 
-When preparing a handoff that exposes assist work, Leftium should:
-
-1. identify matching assist branches when available
-2. verify each reported branch descends from the expected WIP commit
-3. report each branch name, WIP SHA, tip SHA, and useful commit/diff range
+1. identify matching assist branches
+2. verify that each reported branch descends from the expected WIP
+3. report branch name, WIP SHA, tip SHA, and useful range
 4. leave the canonical work branch unchanged
-5. leave incorporation entirely to the receiving participant or explicit project policy
+5. leave incorporation entirely to the human or agent performing the current work
 
 Example:
 
 ```text
 [ok] canonical branch tip is WIP 2f290fc
-[ok] assist/chatgpt/wip-2f290fc descends from WIP; tip 8a31d7b
-[ok] assist/codex/wip-2f290fc descends from WIP; tip 91be044
-[ok] local branch matches expected remote state
-
-READY FOR T3
+[ok] assist/chatgpt/wip-2f290fc -> 8a31d7b
+[ok] assist/codex/wip-2f290fc -> 91be044
 
 Assist work:
   assist/chatgpt/wip-2f290fc  2f290fc..8a31d7b
   assist/codex/wip-2f290fc    2f290fc..91be044
 
-The receiving participant decides whether and how to incorporate each branch.
+No assist work was incorporated automatically.
 ```
 
-The helper must not automatically merge, rebase, cherry-pick, squash, or delete an assist branch.
-
-## Handoff planning and execution
-
-A handoff should first derive a concrete plan from:
-
-- current Git/worktree/index state
-- relevant remote and PR state
-- source participant/profile when known
-- destination participant/profile
-- optional phase/purpose and project policy
-- WIP/checkpoint state
-- available assist branches
-- companion agent policy
-
-The resulting plan may be read-only or mutating.
-
-Common receive-side checks may include:
-
-1. discover the Git repository and relevant pull request when applicable
-2. fetch the remote when the destination relies on remote state
-3. validate the PR/workflow state required by project policy
-4. inspect local worktree and index without discarding or unstaging user changes
-5. checkout and fast-forward the target branch only when safe and needed
-6. verify local HEAD, remote branch head, and PR head where relevant
-7. locate project-defined milestone/work contracts
-8. detect an exact WIP tip
-9. discover and verify assist branches tied to that WIP
-10. check companion handoff policy
-11. report READY, PARTIAL, or BLOCKED with actionable details
-
-Common publish-side actions may include:
-
-1. validate repository, branch, expected remote state, and PR identity
-2. verify unfinished `WIP` is not being presented as final history when project policy requires final history
-3. push normally when the local branch is a fast-forward of the remote branch
-4. support a narrowly guarded history replacement when the remote tip is a previously recorded exact WIP checkpoint and the finished local history intentionally replaces that checkpoint
-5. update PR metadata/body from prepared local handoff content when needed by the destination
-6. change draft/ready state only when required by project policy
-7. verify the final local/remote/PR relationship
-8. report all successful, already-satisfied, failed, and skipped steps
-
-These are capability-derived building blocks, not two mandatory handoff roles. A specific transition may use only a subset.
-
-The command should not automatically run expensive builds or tests unless the project policy or explicit invocation requests them. Those are normally task-specific work rather than generic handoff mechanics.
-
-A successful result is intended to be trusted by the receiving participant. Agent policy should tell agents not to repeat equivalent setup checks merely to verify the helper's verification.
+The helper must not automatically merge, rebase, cherry-pick, squash, or delete assist branches.
 
 ## WIP replacement safety
 
-Any non-fast-forward replacement of a known WIP checkpoint must use an exact expected remote SHA lease. A generic force push is outside the contract.
+Ordinary pushed history should be treated as immutable by the workflow.
 
-The helper must verify that the remote checkpoint still matches the recorded expected WIP before rewriting it. The finished history may contain one or more commits replacing that WIP checkpoint. An unexpected remote move, unrelated rewrite, or ambiguous checkpoint blocks automatic replacement.
+A known WIP checkpoint is the narrow exception. Any non-fast-forward replacement must use an exact expected remote SHA lease. A generic force push is outside the contract.
 
-WIP rewrite permission is a narrowly scoped recovery mechanism, not a general exception to immutable pushed history.
+Before replacing a WIP, Leftium must verify that:
+
+- the expected remote tip is still the exact recorded/detected WIP
+- the remote has not moved unexpectedly
+- the proposed local history is an intentional replacement of that checkpoint rather than an unrelated rewrite
+
+If those conditions cannot be established, synchronization stops without rewriting the remote.
+
+## Project policy and AGENTS.md
+
+Agents need shared instructions describing the project workflow: how to infer the current stage, when draft/ready transitions matter, what "independent review" means, approval requirements, and which helper operations to trust.
+
+A general `agents-md` add-on should own a marked block in repository-root `AGENTS.md` while preserving project-owned prose outside the block.
+
+Earlier discussion used:
+
+```sh
+le add agents-md --preset handoff
+```
+
+The workflow is now broader than participant-to-participant handoff, so the exact preset name is open. `handoff`, `agent-workflow`, or another name should be chosen when this design is integrated with the existing add-on/preset model.
+
+The managed instructions should be provider-neutral. They should tell agents, in substance:
+
+- inspect current repository/shared workflow state before assuming what work comes next
+- treat Git/GitHub/tracked project policy as authoritative over a previous agent's prose summary
+- use the deterministic commit helper for approved commits
+- use synchronization helpers rather than recreating their Git/GitHub checks manually
+- do not automatically incorporate assist work
+- warn when a requested action conflicts with a project workflow constraint
+- allow explicit user direction to override a soft workflow assignment when safe
+
+Project-specific prose outside the managed block may define the actual lifecycle, for example draft PR -> implementation, ready PR -> independent review, human -> merge.
+
+## Persistence and Leftium state
+
+Do **not** assume a separate `.handoff/` directory.
+
+Most state proposed in earlier drafts is already reconstructible from native sources:
+
+- branch and commit state -> Git
+- PR identity/head/base/draft/ready/reviews -> GitHub
+- WIP checkpoint -> Git
+- assist work -> Git branches
+- project workflow -> tracked project files
+- next action -> derived from the above plus project policy
+
+Leftium's roadmap already leaves room for future project policy under `.leftium/`, but intentionally defers a general desired-state schema until a concrete workflow requires data that native files cannot represent.
+
+This feature should preserve that discipline:
+
+> Derive state from Git, GitHub, and tracked project policy wherever possible. Persist additional Leftium state only when a concrete operation cannot be implemented safely or idempotently without it.
+
+If transient local state eventually proves necessary, keep it within a Leftium-owned namespace rather than introducing an unrelated root directory. Its exact location and schema are deferred.
+
+Likewise, do not introduce machine-readable permanent agent-role assignments merely to duplicate workflow policy. Agents are selected by the user for each task.
 
 ## Result and recovery model
 
-Human-readable output should use explicit step states such as:
+Human-readable mutating operations should report explicit step states such as:
 
 - `[ok]` completed successfully
 - `[already]` desired state was already present
@@ -266,116 +370,83 @@ Human-readable output should use explicit step states such as:
 - `[fail]` attempted step failed
 - `[skip]` step was not attempted because a prerequisite failed
 
-Overall states:
+Overall synchronization states may include:
 
-- **READY**: the destination participant may proceed
-- **PARTIAL**: some external effects succeeded, but manual work or a rerun is required before proceeding
+- **READY**: the relevant side is synchronized sufficiently for the next work
+- **PARTIAL**: some external effects succeeded, but a rerun or manual action is required
 - **BLOCKED**: prerequisites are not satisfied and no unsafe mutation was attempted
 
-Expected failures must include practical remediation. If a push succeeds but a later PR edit fails, a rerun must recognize the successful push rather than treating it as a new conflict.
+Expected failures must include practical remediation. If a push succeeds but a later PR edit fails, rerunning must recognize the successful push instead of treating it as a new conflict.
 
-Success output should explicitly identify the destination participant/profile and enough verified state for that participant or a human to know why continuing is safe.
-
-A future machine-readable mode should expose the same semantic result rather than requiring agents to parse prose.
-
-## Companion agent policy
-
-Handoff mechanics alone are insufficient because participants must know when to invoke them, which result they may trust, who owns incorporation decisions, and what an approved compound operation authorizes.
-
-This policy should be installed through a general `agents-md` add-on with a `handoff` preset:
-
-```sh
-npx leftium add agents-md --preset handoff
-```
-
-Do not create a handoff-specific `agents-md-handoff` add-on.
-
-The initial preset should own a clearly marked block in the repository-root `AGENTS.md` while preserving user-owned content outside that block. It should be idempotently regenerable and direct custom project-specific workflow rules outside the managed block.
-
-The generic handoff preset should describe participant/transition invariants rather than hard-code ChatGPT/T3 or a two-role workflow. Project-owned prose may specify local workflow conventions such as:
-
-- which participant or phase owns a draft PR
-- which participant reviews a ready PR
-- whether more than one reviewer/verifier participates
-- when a participant may create assist work
-- who decides incorporation
-- whether a same-participant handoff is used for fresh-session continuation
-
-Actor-specific global instructions may provide convenience aliases or harness policy without changing the generic project contract.
-
-A handoff command should scan the applicable `AGENTS.md` files for the Leftium-managed handoff policy marker/version. Missing or stale companion policy is normally a warning with remediation:
-
-```text
-[warn] Leftium handoff agent policy is not installed or is stale.
-       Run: npx leftium add agents-md --preset handoff
-```
-
-Manual CLI use remains valid without the companion text. Malformed or ambiguous managed markers should be reported as a conflict by the add-on rather than silently replaced.
-
-The first implementation may target `AGENTS.md` only. Other provider-specific instruction files should be added only when a concrete harness requires them; do not duplicate the same policy across several files speculatively.
+A future machine-readable output mode should expose the same semantics without requiring agents to parse prose.
 
 ## Relationship to Leftium architecture
 
-This work exercises two existing Leftium concepts:
+This work exercises several existing Leftium directions:
 
-- **add-ons** adopt persistent project configuration, so `agents-md --preset handoff` belongs under `le add`
-- **non-adopting project operations** execute project-aware workflows without adopting a capability, so handoff belongs in that family even if the final command spelling is `le handoff`
+- **add-ons** adopt persistent project configuration, so managed `AGENTS.md` policy belongs under `le add`
+- **non-adopting project operations** perform project-aware work without adopting configuration, matching status/commit/sync semantics
+- **agent support** already anticipates machine-readable reports and deterministic automation
+- **future .leftium policy** exists as a deferred concept and should only be introduced where native project state proves insufficient
 
-Handoff orchestration should be callable independently of Commander, following the same pattern as existing Leftium orchestration. Git/GitHub/process/filesystem effects belong in the TypeScript shell. Pure classification such as handoff state, WIP state, capability matching, step/result transitions, and profile-independent safety decisions are candidates for the functional core only if implementation shows a useful boundary.
+The orchestration should be callable independently of Commander, following existing Leftium patterns. Git/GitHub/process/filesystem effects belong in the TypeScript shell. Pure classification such as sync state, WIP state, workflow observations, or result transitions are candidates for the functional core only when implementation demonstrates a useful boundary.
 
-Do not require a heavyweight plugin protocol merely to support participant profiles. Start with data-driven built-in profiles and a participant-neutral transition core.
+Do not build a provider plugin framework merely to support this workflow.
 
 ## Safety boundaries
 
 The initial implementation must not:
 
-- assume exactly two participants
-- require source and destination to differ
-- require a fixed implementation/review role pair
-- create WIP commits as part of ordinary handoff
+- assume exactly two agents or participants
+- permanently assign workflow roles to particular harnesses
+- rely on a previous agent's private handoff prose as authoritative project state
+- create WIP commits as part of ordinary synchronization
 - silently stage, unstage, discard, or overwrite unrelated worktree changes
 - automatically incorporate assist-branch commits
 - automatically delete assist branches
 - use an unconstrained force push
 - change PR state when earlier required publication steps failed
-- claim READY when the final state required by the destination is unverified
-- require a particular AI provider or harness for the core workflow
+- claim synchronization success when the required local/remote/PR relationship is unverified
+- create persistent Leftium metadata merely to duplicate reconstructible Git/GitHub/native state
 
 ## Acceptance scenarios
 
 The design should eventually be validated against at least:
 
-1. same-participant handoff to a fresh session with no remote mutation
-2. ordinary hosted-to-local handoff
-3. ordinary local-to-hosted handoff
-4. a three-participant chain where each transition uses the same generic handoff core
-5. more than one valid assist branch from the same WIP checkpoint
-6. repeated handoff with no changes
-7. manually created exact WIP tip with no assist work
-8. WIP tip with valid assist work
-9. assist branch that does not descend from the expected WIP, producing a safe block/warning
-10. dirty/staged local work preserved and reported without destructive cleanup
-11. completed implementation pushed normally and PR state updated when project policy requests it
-12. final history safely replacing a known remote WIP using an exact lease
-13. remote branch changed unexpectedly before WIP replacement
-14. push succeeds but later metadata update fails, followed by successful idempotent rerun
-15. missing companion agent policy with remediation command
-16. stale/malformed managed `AGENTS.md` handoff block
-17. tracked `.handoff/` state rejected before mutating handoff
-18. the same transition mechanics invoked with profiles other than T3/ChatGPT
-19. a workflow with no semantic "review" phase
-20. a workflow with multiple review or verification participants
+1. a fresh agent/session infers the next action using only repository/shared state and project policy
+2. two different agents independently infer the same workflow state from the same evidence
+3. same-local-worktree session rollover that needs no commit or remote mutation
+4. shared-to-local synchronization of a clean draft PR
+5. repeated shared-to-local synchronization with no changes
+6. local-to-shared publication of completed committed work
+7. local uncommitted work correctly reported when it cannot be represented in shared state
+8. deterministic scoped commit preserving unrelated staged changes
+9. deterministic amend with explicit whole-commit file coverage
+10. manually created exact WIP tip with no assist work
+11. WIP tip with one assist branch
+12. WIP tip with several independent assist branches
+13. invalid assist branch that does not descend from the WIP
+14. safe final-history replacement of a known remote WIP using an exact lease
+15. remote WIP moves unexpectedly before replacement
+16. push succeeds but later PR update fails, followed by an idempotent successful rerun
+17. dirty/staged local work is preserved during shared-to-local synchronization
+18. project policy requires independent review and status reports that constraint
+19. the user selects different harnesses for the same workflow stage without changing project policy
+20. no separate Leftium transient state is created when all required state is reconstructible
+21. managed AGENTS.md policy is missing/stale and the tool gives an actionable remediation without pretending the workflow is unavailable
 
 ## Open decisions
 
-- Final CLI grammar for source, destination, optional phase/purpose, and convenience shims.
-- How participant identity differs from reusable profile identity when several sessions use the same harness.
-- Which participant capabilities should be explicit data versus inferred defaults.
-- Exact assist-branch naming when the same profile may create more than one assist branch from one checkpoint.
-- Minimal `.handoff/` state schema and which state is reconstructible.
-- Whether handoff itself, `agents-md`, a future ignore add-on, or composition owns the `.handoff/` ignore rule.
-- How GitHub PR discovery behaves when several PRs or remotes are plausible.
+- Whether the command namespace should be `agent`, another namespace, or selected root commands.
+- Final grammar for status, commit, and sync directions.
+- Whether "shared" or "pr" is the clearest user-facing name for remote Git + GitHub PR state.
+- Exact managed `agents-md` preset name now that the feature is broader than handoff.
+- How generic workflow-state inference should be versus project-specific policy interpretation.
+- How to represent relational constraints such as independent review if plain `AGENTS.md` prose proves insufficient.
+- Whether any non-reconstructible transient state is actually required and, if so, where under Leftium ownership it lives.
+- Exact assist-branch naming when several branches may come from the same source/checkpoint.
+- How PR discovery behaves when several open PRs or remotes are plausible.
 - Exact exit-code mapping for READY, PARTIAL, and BLOCKED.
-- Whether convenience shim binaries ship in the `leftium` package or later as tiny npm shim packages.
+- Whether compatibility shims such as `approved-git-commit` remain external wrappers or ship with Leftium.
 
-These should be settled by implementation fixtures and real multi-participant handoff integrations rather than by assumptions from the initial ChatGPT/T3 workflow.
+These should be settled by implementation fixtures and the first real integrations rather than by assumptions from the original ChatGPT/T3 workflow.
