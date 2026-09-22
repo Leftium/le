@@ -14,6 +14,8 @@ le -> install, inspect, maintain
 
 Leftium must not fork or independently redefine Continuum's lifecycle.
 
+Continuum decides whether and when workflow work is permitted. Guard, when used, protects execution of an already-authorized local mutation; it does not define Continuum policy.
+
 ## Installation
 
 ```sh
@@ -48,7 +50,7 @@ This is read-only. It should inspect enough local and GitHub evidence to decide 
 - dependency/blocking relationships;
 - review state that affects the next protocol action.
 
-Apply Continuum's authoritative-state and next-action rules. Do not invent parallel Leftium workflow stages.
+`le continuum check` is a versioned Continuum protocol client. It may apply authoritative-state and next-action rules only for protocol versions Leftium explicitly supports, and those interpretations should be covered by versioned protocol/conformance fixtures. Do not invent parallel Leftium workflow stages.
 
 A successful check should be trustworthy enough that an agent does not repeat the same Git/GitHub consistency checks merely to verify Leftium's verification.
 
@@ -81,7 +83,7 @@ This updates installed Continuum artifacts between supported protocol/template v
 
 It migrates protocol installation, not live workflow state. It must not rewrite issues, branches, commits, or PR lifecycle state merely because a template version changed.
 
-Before implementation, define version detection, supported migration paths, conflict behavior for customized managed content, and how the targeted protocol version is declared.
+Before implementation, define version detection, supported migration paths, conflict behavior for customized managed content, how the targeted protocol version is declared, and which protocol semantics the installed Leftium release can interpret.
 
 ## Remote mutations
 
@@ -136,20 +138,23 @@ Cover at least:
 2. unrelated `AGENTS.md` prose survives install/update;
 3. malformed/conflicting managed block is actionable;
 4. `check` identifies protocol version;
-5. clean local/remote/PR heads agree;
-6. uncommitted local work is reported local-only without committing;
-7. committed-but-unpushed work is distinguished from shared state;
-8. ambiguous remotes/PRs block instead of guessing;
-9. Draft/Ready and dependency state are interpreted via Continuum;
-10. repeated checks are mutation-free;
-11. protocol update preserves project-owned content;
-12. a future partial remote mutation can be safely inspected/rerun;
-13. no extra metadata is created when native state is sufficient.
+5. supported protocol versions have versioned fixtures for state/next-action interpretation;
+6. unsupported protocol versions block instead of being interpreted heuristically;
+7. clean local/remote/PR heads agree;
+8. uncommitted local work is reported local-only without committing;
+9. committed-but-unpushed work is distinguished from shared state;
+10. ambiguous remotes/PRs block instead of guessing;
+11. Draft/Ready and dependency state are interpreted via the supported Continuum version;
+12. repeated checks are mutation-free;
+13. protocol update preserves project-owned content;
+14. a future partial remote mutation can be safely inspected/rerun;
+15. no extra metadata is created when native state is sufficient.
 
 ## Open decisions
 
 - versioned template packaging/source;
 - first supported Continuum protocol version;
+- protocol/conformance fixture source and ownership;
 - explicit discovery/disambiguation grammar;
 - GitHub CLI vs direct API support;
 - later aggregation into generic `check/update`;
