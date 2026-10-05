@@ -78,3 +78,26 @@ test('unsupported adapters, dynamic config, fallback, output and base conflicts 
   ])
     assert.throws(() => configureSvelte(config, '/app', true));
 });
+
+test('current inline Vite options preserve unrelated Vite and compiler settings', async () => {
+  const { configureVite } = await import('../src/addons/pages/config.js');
+  const source = `import adapter from '@sveltejs/adapter-auto';
+import { sveltekit } from '@sveltejs/kit/vite';
+import { defineConfig } from 'vite';
+export default defineConfig({ server: { port: 5000 }, plugins: [sveltekit({ compilerOptions: { runes: true }, adapter: adapter() })] });`;
+  assert.equal(configureVite(source, '/app', false)!.needsReplacement, true);
+  const result = configureVite(source, '/app', true)!;
+  parse(result.text, { ecmaVersion: 'latest', sourceType: 'module' });
+  assert.match(result.text, /server: \{ port: 5000 \}/);
+  assert.match(result.text, /compilerOptions: \{ runes: true \}/);
+  assert.match(result.text, /adapter-static/);
+  assert.equal(configureVite(result.text, '/app', false)!.text, result.text);
+  assert.equal(
+    configureVite(
+      "import { sveltekit } from '@sveltejs/kit/vite'; export default { plugins: [sveltekit()] };",
+      '',
+      false,
+    ),
+    undefined,
+  );
+});

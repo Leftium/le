@@ -1,8 +1,8 @@
 import { Command } from 'commander';
 import * as prompts from '@clack/prompts';
-import { runAdd } from '../orchestration/add.js';
+import { runAdd, type AddRequest } from '../orchestration/add.js';
 import { CreateFailure, runCreate } from '../orchestration/create.js';
-import type { Interaction, LicenseRequest } from '../addons/license/index.js';
+import type { Interaction } from '../addons/license/index.js';
 import { version } from '../version.js';
 import { AddCommand } from './add-command.js';
 
@@ -64,6 +64,32 @@ export function createCommand(): Command {
       '--non-interactive',
       'never prompt; fail when a required choice is missing',
     )
+    .option('--repository <owner/repo>', 'GitHub Pages repository target')
+    .option(
+      '--repository-root <dir>',
+      'repository root when Git is unavailable',
+    )
+    .option(
+      '--site-url <url>',
+      'canonical HTTPS Pages URL or custom-domain root',
+    )
+    .option(
+      '--replace-adapter',
+      'replace the recognized SvelteKit adapter-auto',
+    )
+    .option(
+      '--package-manager <manager>',
+      'Pages installation manager: npm or pnpm',
+    )
+    .option(
+      '--package-manager-version <version>',
+      'exact Pages package-manager version',
+    )
+    .option('--node-version <version>', 'Pages workflow Node version or range')
+    .option(
+      '--workflow-ref <ref>',
+      'immutable Leftium Pages workflow reference',
+    )
     .option(
       '--no-install',
       'skip dependency installation (license needs no installation)',
@@ -71,13 +97,13 @@ export function createCommand(): Command {
     .action(
       async (
         addon: string | undefined,
-        options: LicenseRequest & { nonInteractive?: boolean },
+        options: AddRequest & { nonInteractive?: boolean },
       ) => {
         const tty = interactive(options);
         if (!addon) {
           if (!tty) {
             process.stderr.write(
-              'failed: Supply an add-on (license or gitattributes); selection requires an interactive terminal.\n',
+              'failed: Supply an add-on (license, gitattributes, or pages); selection requires an interactive terminal.\n',
             );
             process.exitCode = 1;
             return;
@@ -87,6 +113,7 @@ export function createCommand(): Command {
             options: [
               { value: 'license', label: 'License' },
               { value: 'gitattributes', label: 'Git attributes' },
+              { value: 'pages', label: 'GitHub Pages' },
             ],
           });
           if (prompts.isCancel(choice)) {
@@ -94,7 +121,7 @@ export function createCommand(): Command {
             process.exitCode = 1;
             return;
           }
-          addon = choice as 'license' | 'gitattributes';
+          addon = choice as 'license' | 'gitattributes' | 'pages';
         }
         if (tty && addon === 'license' && options.preset === undefined) {
           const choice = await prompts.select({
@@ -144,8 +171,12 @@ export function createCommand(): Command {
           output.write(
             effect.kind === 'file'
               ? `  ${effect.path}\n`
-              : `  local Git config: ${effect.key}\n`,
+              : effect.kind === 'git-config'
+                ? `  local Git config: ${effect.key}\n`
+                : `  ${effect.manager}: ${effect.operation} in ${effect.cwd}\n`,
           );
+        for (const item of result.pages?.followUp ?? [])
+          output.write(`  follow-up: ${item}\n`);
         process.exitCode = result.delegated?.exitCode ?? (success ? 0 : 1);
         if (result.delegated?.signal)
           process.kill(process.pid, result.delegated.signal);

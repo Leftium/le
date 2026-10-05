@@ -225,8 +225,11 @@ export function configureSvelte(
             );
           if (
             p &&
-            node(p.value).type !== 'Identifier' &&
-            literal(p.value) === undefined
+            literal(p.value) === undefined &&
+            !(
+              node(p.value).type === 'Identifier' &&
+              node(p.value).name === 'undefined'
+            )
           )
             conflict('Dynamic adapter options are unsupported.');
         }
@@ -238,7 +241,8 @@ export function configureSvelte(
             typeof value !== 'string' ||
             !/^[A-Za-z0-9_-][A-Za-z0-9_./-]*$/.test(value) ||
             value.split('/').includes('..') ||
-            value.startsWith('.')
+            value.startsWith('.') ||
+            ['src', 'static', 'node_modules'].includes(value.split('/')[0]!)
           )
             conflict('The adapter output directory is unknown or unsafe.');
           output = value;
@@ -279,4 +283,119 @@ export function configureSvelte(
   for (const patch of patches.sort((a, b) => b.start - a.start))
     text = text.slice(0, patch.start) + patch.text + text.slice(patch.end);
   return { text, output, needsReplacement };
+}
+
+/** Current Kit configuration lives in the sveltekit Vite plugin options. */
+export function configureVite(
+  text: string,
+  base: string,
+  replaceAdapter: boolean,
+): ReturnType<typeof configureSvelte> | undefined {
+  let ast: Syntax;
+  try {
+    ast = parse(text, {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+    }) as unknown as Syntax;
+  } catch {
+    conflict(
+      'Vite configuration must use JavaScript-compatible syntax for automatic Pages setup.',
+    );
+  }
+  const body = ast.body as Syntax[];
+  const imported = body.find(
+    (n) =>
+      n.type === 'ImportDeclaration' &&
+      literal(n.source) === '@sveltejs/kit/vite',
+  );
+  const specifier = (imported?.specifiers as Syntax[] | undefined)?.find(
+    (n) => node(n.imported).name === 'sveltekit',
+  );
+  if (!specifier)
+    conflict('Vite config must import the SvelteKit plugin explicitly.');
+  const pluginName = node(specifier.local).name;
+  let exported = node(
+    body.find((n) => n.type === 'ExportDefaultDeclaration')?.declaration,
+  );
+  if (exported?.type === 'CallExpression') {
+    const define = body.find(
+      (n) => n.type === 'ImportDeclaration' && literal(n.source) === 'vite',
+    );
+    const binding = (define?.specifiers as Syntax[] | undefined)?.find(
+      (n) => node(n.imported).name === 'defineConfig',
+    );
+    if (
+      !binding ||
+      node(exported.callee).name !== node(binding.local).name ||
+      (exported.arguments as Syntax[]).length !== 1
+    )
+      conflict('Vite default export must use a literal defineConfig object.');
+    exported = (exported.arguments as Syntax[])[0]!;
+  }
+  const vite = object(exported, 'Vite configuration');
+  const plugins = node(property(vite, 'plugins')?.value);
+  if (plugins?.type !== 'ArrayExpression')
+    conflict('Vite plugins must be a literal array.');
+  const calls = (plugins.elements as Syntax[]).filter(
+    (n) => n?.type === 'CallExpression' && node(n.callee).name === pluginName,
+  );
+  if (calls.length !== 1)
+    conflict('Vite plugins must contain exactly one sveltekit call.');
+  const call = calls[0]!;
+  const args = call.arguments as Syntax[];
+  if (!args.length) return undefined; // Legacy config remains authoritative.
+  if (args.length !== 1)
+    conflict('SvelteKit Vite plugin options are ambiguous.');
+  object(args[0], 'SvelteKit Vite plugin options');
+  const adapterImports = body.filter(
+    (n) =>
+      n.type === 'ImportDeclaration' &&
+      String(literal(n.source)).startsWith('@sveltejs/adapter-'),
+  );
+  const imports = adapterImports
+    .map((n) => text.slice(n.start, n.end))
+    .join('\n');
+  const source = `${imports}\nexport default { kit: ${text.slice(args[0]!.start, args[0]!.end)} };`;
+  const result = configureSvelte(source, base, replaceAdapter);
+  if (result.needsReplacement && !replaceAdapter) return { ...result, text };
+  const transformed = parse(result.text, {
+    ecmaVersion: 'latest',
+    sourceType: 'module',
+  }) as unknown as Syntax;
+  const transformedBody = transformed.body as Syntax[];
+  const config = node(
+    transformedBody.find((n) => n.type === 'ExportDefaultDeclaration')!
+      .declaration,
+  );
+  const kit = node(property(config, 'kit')!.value);
+  const patches: Patch[] = [
+    {
+      start: args[0]!.start,
+      end: args[0]!.end,
+      text: result.text.slice(kit.start, kit.end),
+    },
+  ];
+  const newImports = transformedBody.filter(
+    (n) => n.type === 'ImportDeclaration',
+  );
+  if (adapterImports.length) {
+    patches.push({
+      start: adapterImports[0]!.start,
+      end: adapterImports[0]!.end,
+      text: result.text.slice(newImports[0]!.start, newImports[0]!.end),
+    });
+  } else {
+    if (/\bleftiumStaticAdapter\b/.test(text))
+      conflict(
+        'The generated adapter import name is already used in Vite config.',
+      );
+    patches.push({
+      start: 0,
+      end: 0,
+      text: result.text.slice(newImports[0]!.start, newImports[0]!.end) + '\n',
+    });
+  }
+  for (const patch of patches.sort((a, b) => b.start - a.start))
+    text = text.slice(0, patch.start) + patch.text + text.slice(patch.end);
+  return { ...result, text };
 }

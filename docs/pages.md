@@ -1,6 +1,6 @@
 # SvelteKit on GitHub Pages
 
-`le add pages` prepares a standalone, fully prerendered SvelteKit app at its repository root. It configures adapter-static, adds root prerender/trailing-slash exports, and writes a thin `.github/workflows/pages.yml` caller. The CLI reports local configuration, static-build verification, and remote-deployment verification separately.
+`le add pages` prepares a standalone, fully prerendered SvelteKit app at its repository root. It configures adapter-static in the SvelteKit Vite plugin options or legacy svelte.config.js, adds root prerender/trailing-slash exports, and writes a thin `.github/workflows/pages.yml` caller. The CLI reports local configuration, static-build verification, and remote-deployment verification separately.
 
 ## Adoption
 
@@ -57,7 +57,9 @@ Reruns preserve supported caller customization and do not rewrite a caller that 
 
 ## Limits and troubleshooting
 
-Workspace deployment, apps below the repository root, arbitrary adapters, dynamic Svelte configs, TypeScript Svelte config files, custom source directories, separate asset output, and SPA fallbacks require manual setup. The workflow exposes app-directory for its contract, but Leftium generates only the standalone configuration verified here.
+Workspace deployment, apps below the repository root, arbitrary adapters, dynamic Svelte configs, TypeScript-only config syntax, custom source directories, separate asset output, and SPA fallbacks require manual setup. The workflow exposes app-directory for its contract, but Leftium generates only the standalone configuration verified here.
+
+The current sv template uses JavaScript-compatible vite.config.ts options. Leftium edits those options in place. Legacy svelte.config.js remains supported; conflicting simultaneous inline and legacy configs require manual reconciliation. See the [SvelteKit Vite configuration API](https://svelte.dev/docs/kit/@sveltejs-kit-vite).
 
 Inspection rejects known request-time requirements, including actions, cookies/locals, request headers, runtime private environment access, and server hooks. Server load code used only during prerendering is allowed. Inspection is conservative and cannot prove arbitrary source code static; a successful strict adapter build and output checks provide the verification. Dynamic route entries are governed by SvelteKit's strict prerendering. Configure their entries manually when necessary.
 

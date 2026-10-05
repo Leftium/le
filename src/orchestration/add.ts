@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { discover } from '../project/context.js';
 import { applyEdits, readRegular } from '../project/files.js';
 import {
@@ -12,14 +13,24 @@ import {
   verifyGitConfig,
   type GitattributesRequest,
 } from '../addons/gitattributes/index.js';
+import {
+  planPages,
+  preparePagesDirectories,
+  installAndVerifyPages,
+  type PagesRequest,
+  type PagesOutcome,
+  type PagesPlan,
+} from '../addons/pages/index.js';
 import { Stopped } from './stopped.js';
 import { delegateSvAdd, sveltePackage } from '../providers/sv.js';
 
 export function isBuiltinAddon(addon: string): boolean {
-  return addon === 'license' || addon === 'gitattributes';
+  return addon === 'license' || addon === 'gitattributes' || addon === 'pages';
 }
 
-export type AddRequest = (LicenseRequest | GitattributesRequest) & {
+export type AddRequest = (LicenseRequest &
+  GitattributesRequest &
+  PagesRequest) & {
   addon: string;
   // Upstream flags and extra add-ons; target selection belongs in cwd.
   upstreamArgs?: readonly string[];
@@ -31,6 +42,7 @@ export type AddResult = {
   changed: string[];
   effects: AddEffect[];
   message: string;
+  pages?: PagesOutcome;
   delegated?: { exitCode: number; signal?: NodeJS.Signals };
 };
 // TODO: Keep effects generic enough for composed add-ons. A future nodiff
@@ -38,6 +50,12 @@ export type AddResult = {
 // representing .git/config as a tracked file.
 export type AddEffect =
   | { kind: 'file'; path: string }
+  | {
+      kind: 'package-operation';
+      manager: string;
+      cwd: string;
+      operation: string;
+    }
   | { kind: 'git-config'; scope: 'local'; key: string };
 
 export async function runAdd(
@@ -47,6 +65,8 @@ export async function runAdd(
   const changed: string[] = [];
   const effects: AddEffect[] = [];
   let verification: AddResult['verification'] = 'skipped';
+  let pagesPlan: PagesPlan | undefined;
+  let pages: PagesOutcome | undefined;
   let installedGitConfig:
     Awaited<ReturnType<typeof planGitattributes>>['gitConfig'] | undefined;
   try {
@@ -91,10 +111,14 @@ export async function runAdd(
           key: plan.gitConfig.key,
         });
       }
+    } else if (request.addon === 'pages') {
+      pagesPlan = await planPages(context, request, interaction);
+      edits = pagesPlan.edits;
+      await preparePagesDirectories(pagesPlan);
     } else
       throw new Stopped(
         'unsupported',
-        `Add-on '${request.addon}' is not implemented in this slice. Supported: license, gitattributes.`,
+        `Add-on '${request.addon}' is not implemented in this slice. Supported: license, gitattributes, pages.`,
       );
     try {
       await applyEdits(edits, changed);
@@ -123,14 +147,54 @@ export async function runAdd(
       if (plan.gitConfig) await verifyGitConfig(plan.gitConfig);
     }
     verification = 'passed';
+    if (pagesPlan) {
+      pages = {
+        localConfiguration: 'applied',
+        staticBuild: 'skipped',
+        remoteDeployment: 'skipped',
+        followUp: pagesPlan.followUp,
+      };
+      if (request.install !== false) {
+        effects.push({
+          kind: 'package-operation',
+          manager: pagesPlan.manager,
+          cwd: pagesPlan.app,
+          operation: 'install, checks, and static build',
+        });
+        let building = false;
+        const lockPath = join(
+          pagesPlan.app,
+          pagesPlan.manager === 'npm' ? 'package-lock.json' : 'pnpm-lock.yaml',
+        );
+        const lockBefore = await readRegular(lockPath);
+        try {
+          await installAndVerifyPages(pagesPlan, () => {
+            building = true;
+          });
+          pages.staticBuild = 'passed';
+        } catch (error) {
+          pages.staticBuild = building ? 'failed' : 'skipped';
+          verification = 'failed';
+          throw error;
+        } finally {
+          if ((await readRegular(lockPath)) !== lockBefore) {
+            changed.push(lockPath);
+            effects.push({ kind: 'file', path: lockPath });
+          }
+        }
+      }
+    }
     return {
       status: effects.length ? 'applied' : 'no-op',
       verification,
       changed,
       effects,
-      message: effects.length
-        ? `${request.addon} applied and verified.`
-        : `${request.addon} already current.`,
+      ...(pages ? { pages } : {}),
+      message: pages
+        ? `Pages local configuration applied; static build ${pages.staticBuild}; remote deployment skipped.`
+        : effects.length
+          ? `${request.addon} applied and verified.`
+          : `${request.addon} already current.`,
     };
   } catch (error) {
     return {
@@ -138,7 +202,8 @@ export async function runAdd(
       verification,
       changed,
       effects,
-      message: `${error instanceof Error ? error.message : String(error)}${changed.length || effects.length ? ' Partial output remains; review the reported effects before retrying.' : ''}`,
+      ...(pages ? { pages } : {}),
+      message: `${pages ? `Pages local configuration ${pages.localConfiguration}; static build ${pages.staticBuild}; remote deployment skipped. ` : ''}${error instanceof Error ? error.message : String(error)}${changed.length || effects.length ? ' Partial output remains; review the reported effects before retrying.' : ''}`,
     };
   }
 }

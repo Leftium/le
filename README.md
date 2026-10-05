@@ -1,6 +1,6 @@
 # Leftium
 
-Leftium creates projects and applies project conventions through add-ons. The implemented built-ins are `le add license` and `le add gitattributes`. Other add-ons in Svelte projects delegate to the bundled `sv` CLI. A narrow Svelte creation implementation is published experimentally and serves as the creation architecture spike. Broader supported creation UX and environment coverage and the Pages add-on remain in progress; see the [active spec](specs/10-leftium/00-spec.md).
+Leftium creates projects and applies project conventions through add-ons. The implemented built-ins are `le add license`, `le add gitattributes`, and `le add pages`. Other add-ons in Svelte projects delegate to the bundled `sv` CLI. A narrow Svelte creation implementation is published experimentally and serves as the creation architecture spike. Broader supported creation UX and environment coverage remain in progress; see the [active spec](specs/10-leftium/00-spec.md).
 
 Install the published CLI with Node 24:
 
@@ -44,6 +44,17 @@ le add file:../my-addon=who:hello --no-install --no-download-check
 Supply the add-on before upstream options. Leftium consumes `-C` / `--cwd` and passes the nearest enclosing package root to `sv`; a workspace root does not select a child app. Other arguments, including inline add-on options and additional upstream add-ons, reach `sv` unchanged. Relative `file:` requests are resolved by `sv` against that package root.
 
 Upstream owns prompts, dependency installation, output, and exit status. Use explicit add-on options and upstream flags such as `--no-install`, `--no-git-check`, and `--no-download-check` for automation. Leftium's `--non-interactive` applies to built-ins and is rejected on delegation. Non-Svelte packages fail before launching `sv`. Leftium reports delegation without claiming to verify upstream changes.
+
+## GitHub Pages
+
+For a standalone, fully prerendered SvelteKit app, `le add pages` configures static output and creates a caller pinned to the reusable Leftium workflow. Adapter-auto replacement requires an explicit choice.
+
+```sh
+le add pages --repository owner/repository --replace-adapter --node-version 24
+le add pages --repository owner/repository --replace-adapter --node-version 24 --no-install
+```
+
+Declare the package manager in package.json or pass `--package-manager`; pnpm also needs an exact version. Use `--site-url https://example.com/` for a custom domain. Leftium verifies local static routes/assets when it runs the build and reports skipped verification with `--no-install`. GitHub Pages settings, DNS, and deployed-site verification remain explicit follow-up. Workspace deployment and SPA fallbacks are unsupported. See the [Pages adoption and maintenance guide](docs/pages.md) for the workflow contract, updates, supported customization, and troubleshooting.
 
 ## Development
 
