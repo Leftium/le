@@ -4,6 +4,7 @@ import { runAdd } from '../orchestration/add.js';
 import { CreateFailure, runCreate } from '../orchestration/create.js';
 import type { Interaction, LicenseRequest } from '../addons/license/index.js';
 import { version } from '../version.js';
+import { AddCommand } from './add-command.js';
 
 function terminalInteraction(): Interaction {
   return {
@@ -31,15 +32,17 @@ function interactive(options: { nonInteractive?: boolean }): boolean {
 
 export function createCommand(): Command {
   const program = new Command('leftium')
+    .enablePositionalOptions()
     .description('Create projects and apply project conventions.')
     .version(version)
     .addHelpText('before', `leftium ${version}\n\n`)
     .action(() => program.outputHelp());
-  program
-    .command('add')
+  const addCommand = new AddCommand('add').copyInheritedSettings(program);
+  program.addCommand(addCommand);
+  addCommand
     .argument(
       '[addon]',
-      'add-on to apply (license or gitattributes; choose interactively when omitted)',
+      'Leftium add-on or upstream sv add-on (sv:<name> selects upstream explicitly)',
     )
     .option('-C, --cwd <dir>', 'target directory')
     .option(
@@ -130,7 +133,7 @@ export function createCommand(): Command {
         }
         if (!addon) throw new Error('Add-on selection did not resolve.');
         const result = await runAdd(
-          { ...options, addon },
+          { ...options, addon, upstreamArgs: addCommand.upstreamArgs },
           tty ? terminalInteraction() : undefined,
         );
         const success =
@@ -143,7 +146,9 @@ export function createCommand(): Command {
               ? `  ${effect.path}\n`
               : `  local Git config: ${effect.key}\n`,
           );
-        process.exitCode = success ? 0 : 1;
+        process.exitCode = result.delegated?.exitCode ?? (success ? 0 : 1);
+        if (result.delegated?.signal)
+          process.kill(process.pid, result.delegated.signal);
       },
     );
   program

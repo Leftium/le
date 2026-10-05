@@ -23,6 +23,15 @@ Complete v0 add-on resolution by delegating compatible unknown Svelte add-ons to
 - delegate through the real `sv` CLI so interactive behavior and process status remain upstream-owned
 - keep Leftium output sufficient to identify when `sv` handled the request
 
+## Boundary decisions
+
+- Built-ins retain strict Commander parsing. Delegated requests use a separate parser so upstream flags, values, inline options, separators, and additional add-ons survive unchanged. Put the selected add-on before upstream options.
+- Resolve the installed `sv` package's declared executable and spawn it with the current Node executable and inherited stdio. Do not download another CLI or use a global `sv`.
+- Require a Svelte dependency in the nearest package's dependencies/devDependencies, pass that package root through upstream `--cwd`, and leave upstream add-on-specific compatibility checks to `sv`. Workspace roots never select arbitrary children.
+- The Leftium `--non-interactive` flag is rejected for passthrough because it cannot promise to suppress upstream prompts. Automation supplies upstream flags and explicit add-on options instead.
+- Report upstream status separately from Leftium verification; propagate numeric exit codes and signal termination.
+- Fixtures run official Prettier in SvelteKit and Svelte without Kit, a local community add-on with inline options, and a packed-layout stub for scoped/versioned names, flag collisions, input, exit codes, signals, and targeting. Registry package resolution stays upstream-owned; deterministic tests do not download third-party community packages.
+
 ## Verify
 
 - built-in collisions still resolve to Leftium
