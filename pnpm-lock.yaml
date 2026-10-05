@@ -138,6 +138,9 @@ importers:
       '@rescript/runtime':
         specifier: 12.3.1
         version: 12.3.1
+      acorn:
+        specifier: 8.15.0
+        version: 8.15.0
       commander:
         specifier: 15.0.0
         version: 15.0.0
@@ -425,6 +428,14 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  acorn@8.15.0:
+    resolution:
+      {
+        integrity: sha512-NZyJarBfL7nWwIq+FDL6Zp/yHEhePMNnnJ0y3qfieCrmNvYct8uvtiV41UvlSe6apAfk0fY1FbWx+NwfmpvtTg==,
+      }
+    engines: { node: '>=0.4.0' }
+    hasBin: true
+
   balanced-match@4.0.4:
     resolution:
       {
@@ -623,6 +634,8 @@ snapshots:
 
   '@typescript/typescript-win32-x64@7.0.2':
     optional: true
+
+  acorn@8.15.0: {}
 
   balanced-match@4.0.4: {}
 

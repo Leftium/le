@@ -8,7 +8,7 @@ The npm package is `leftium`. It exposes `leftium` as the canonical command and 
 le add [options] [addon]
 ```
 
-`add` detects the project, resolves the add-on, inspects existing state, plans the change, then applies and verifies it. In an interactive terminal, omitting `addon` opens a selector for `license` or `gitattributes`. Supplying an add-on never opens that selector. Outside an interactive terminal, an omitted add-on fails before mutation.
+`add` detects the project, resolves the add-on, inspects existing state, plans the change, then applies and verifies it. In an interactive terminal, omitting `addon` opens a selector for `license`, `gitattributes`, or `pages`. Supplying an add-on never opens that selector. Outside an interactive terminal, an omitted add-on fails before mutation.
 
 When an interactive `license` invocation omits `--preset`, it selects from `mit`, `apache-2.0`, `bsd-3-clause`, and `isc`; MIT is the initial choice. Explicit presets bypass the menu. An interactive `gitattributes` invocation without `--preset` offers a multiselect with `nodiff` initially selected. Explicit presets bypass that menu; non-interactive omission retains the existing deterministic `nodiff` default.
 
