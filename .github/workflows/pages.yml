@@ -49,6 +49,11 @@ jobs:
         with:
           version: ${{ inputs.package-manager-version }}
           run_install: false
+      - name: Select declared npm version
+        if: inputs.package-manager == 'npm' && inputs.package-manager-version != ''
+        env:
+          NPM_VERSION: ${{ inputs.package-manager-version }}
+        run: npm install --global "npm@$NPM_VERSION"
       - name: Validate package manager
         env:
           MANAGER: ${{ inputs.package-manager }}
