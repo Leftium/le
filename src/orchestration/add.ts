@@ -13,9 +13,16 @@ import {
   type GitattributesRequest,
 } from '../addons/gitattributes/index.js';
 import { Stopped } from './stopped.js';
+import { delegateSvAdd, sveltePackage } from '../providers/sv.js';
+
+export function isBuiltinAddon(addon: string): boolean {
+  return addon === 'license' || addon === 'gitattributes';
+}
 
 export type AddRequest = (LicenseRequest | GitattributesRequest) & {
   addon: string;
+  // Upstream flags and extra add-ons; target selection belongs in cwd.
+  upstreamArgs?: readonly string[];
 };
 export type AddResult = {
   status:
@@ -24,6 +31,7 @@ export type AddResult = {
   changed: string[];
   effects: AddEffect[];
   message: string;
+  delegated?: { exitCode: number; signal?: NodeJS.Signals };
 };
 // TODO: Keep effects generic enough for composed add-ons. A future nodiff
 // add-on may report separate gitattributes and gitconfig child effects without
@@ -43,6 +51,32 @@ export async function runAdd(
     Awaited<ReturnType<typeof planGitattributes>>['gitConfig'] | undefined;
   try {
     const context = await discover(request.cwd ?? process.cwd());
+    if (!isBuiltinAddon(request.addon)) {
+      const addon = request.addon.startsWith('sv:')
+        ? request.addon.slice(3)
+        : request.addon;
+      if (!addon || addon.startsWith('-'))
+        throw new Stopped(
+          'unsupported',
+          'Supply an upstream add-on name after sv:.',
+        );
+      const packageRoot = await sveltePackage(context);
+      const delegated = await delegateSvAdd(context, packageRoot, [
+        addon,
+        ...(request.upstreamArgs ?? []),
+      ]);
+      return {
+        status:
+          delegated.exitCode === 0 && !delegated.signal ? 'applied' : 'failed',
+        verification: 'skipped',
+        changed,
+        effects,
+        delegated,
+        message: delegated.signal
+          ? `sv terminated with ${delegated.signal}.`
+          : `sv exited with status ${delegated.exitCode}.`,
+      };
+    }
     let edits;
     if (request.addon === 'license')
       edits = await planLicense(context, request, interaction);

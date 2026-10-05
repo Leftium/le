@@ -1,6 +1,6 @@
 # Leftium
 
-Leftium creates projects and applies project conventions through add-ons. The implemented built-ins are `le add license` and `le add gitattributes`. A narrow Svelte creation implementation is published experimentally and serves as the creation architecture spike. Broader supported creation UX and environment coverage, the Pages add-on, and transparent `sv add` delegation remain in progress; see the [active spec](specs/10-leftium/00-spec.md).
+Leftium creates projects and applies project conventions through add-ons. The implemented built-ins are `le add license` and `le add gitattributes`. Other add-ons in Svelte projects delegate to the bundled `sv` CLI. A narrow Svelte creation implementation is published experimentally and serves as the creation architecture spike. Broader supported creation UX and environment coverage and the Pages add-on remain in progress; see the [active spec](specs/10-leftium/00-spec.md).
 
 Install the published CLI with Node 24:
 
@@ -29,6 +29,21 @@ le add license -C ./packages/app --package-license --author "Your Name"
 Explicit author and year values win. Otherwise, an existing canonical MIT notice supplies them; author inference then tries the target package author and Git's configured name. A new notice defaults to the current year. Missing author input prompts in a terminal and fails in automation. `--package-license` explicitly permits a separate license in a workspace package when an ancestor license exists; `--force` alone does not make that scope choice. This slice recognizes npm/Yarn workspace globs and explicit pnpm workspace package lists.
 
 `--no-install` is accepted; the license operation needs no package installation. Completed applied/no-op requests exit zero. Conflicts, unsupported requests, cancellation, and failures exit nonzero. Failures can leave partial output; the report names affected files. Leftium does not stage or commit changes.
+
+## Svelte add-ons
+
+In a Svelte or SvelteKit package, unknown add-on names run through the pinned `sv` dependency. Built-in names always select Leftium; prefix a name with `sv:` to select upstream behavior explicitly.
+
+```sh
+le add prettier --no-install --no-git-check
+le add sv:prettier -C ./packages/app --no-install
+le add @example/sv --no-install
+le add file:../my-addon=who:hello --no-install --no-download-check
+```
+
+Supply the add-on before upstream options. Leftium consumes `-C` / `--cwd` and passes the nearest enclosing package root to `sv`; a workspace root does not select a child app. Other arguments, including inline add-on options and additional upstream add-ons, reach `sv` unchanged. Relative `file:` requests are resolved by `sv` against that package root.
+
+Upstream owns prompts, dependency installation, output, and exit status. Use explicit add-on options and upstream flags such as `--no-install`, `--no-git-check`, and `--no-download-check` for automation. Leftium's `--non-interactive` applies to built-ins and is rejected on delegation. Non-Svelte packages fail before launching `sv`. Leftium reports delegation without claiming to verify upstream changes.
 
 ## Development
 
