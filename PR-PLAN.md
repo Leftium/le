@@ -72,3 +72,13 @@ Cover the Pages spec matrix, including:
 - custom-domain/CNAME preservation and remote follow-up reporting
 - idempotent second run
 - existing tests and CI remain green
+
+## Implementation decisions
+
+- Contract v1 uses an immutable Git commit SHA published on the implementation branch before caller generation. It does not create a release/tag or enable remote Pages settings.
+- Configure current SvelteKit Vite plugin options in place, including the JavaScript-compatible vite.config.ts emitted by the pinned sv provider. Also support legacy svelte.config.js. Stop on conflicting simultaneous sources or TypeScript-only syntax rather than guessing.
+- Acorn syntax spans preserve unrelated Svelte/Vite settings; YAML document edits preserve supported caller comments, triggers, script choices, and additional jobs. Unknown customization stops before mutation.
+- Only standalone apps at the repository root are generated. Workspace/app-directory/shared-install deployment requires a separate verified consumer contract.
+- Native package installation and metadata-selected scripts feed strict adapter-static builds. Output verification checks literal routes and HTML asset references; dynamic route entries remain governed by strict SvelteKit prerendering.
+- Network fixture verification is opt-in with LE_PAGES_BUILD_TEST=1; normal project tests remain offline. Fixtures cover npm project/root/custom-domain sites and a pnpm consumer.
+- Remote deployment remains explicitly unverified until a consumer workflow runs against configured GitHub Pages settings. No deployment, DNS change, tag/release, or merge is performed in this implementation run.

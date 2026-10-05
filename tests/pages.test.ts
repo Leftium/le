@@ -136,6 +136,14 @@ test('unsupported server behavior and adapter/workflow conflicts stop before mut
     ],
     ['src/routes/+page.ts', 'export const prerender = false;'],
     [
+      'src/routes/api/+server.ts',
+      'export const POST = async () => new Response("request time");',
+    ],
+    [
+      'src/lib/api.remote.ts',
+      "import { command } from '$app/server'; export const save = command(async () => {});",
+    ],
+    [
       'src/hooks.server.ts',
       'export const handle = async ({event, resolve}) => resolve(event);',
     ],

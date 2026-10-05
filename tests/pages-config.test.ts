@@ -75,6 +75,7 @@ test('unsupported adapters, dynamic config, fallback, output and base conflicts 
     'export default { kit: { paths: { base: "/wrong" } } };',
     'export default { ...custom };',
     'export default makeConfig();',
+    'const config = {}; config.kit = custom; export default config;',
   ])
     assert.throws(() => configureSvelte(config, '/app', true));
 });
@@ -100,4 +101,14 @@ export default defineConfig({ server: { port: 5000 }, plugins: [sveltekit({ comp
     ),
     undefined,
   );
+});
+
+test('commas inside comments do not hide a missing property separator', () => {
+  const result = configureSvelte(
+    'export default { preprocess: fn() /* preserve this, including punctuation */ };',
+    '',
+    false,
+  );
+  parse(result.text, { ecmaVersion: 'latest', sourceType: 'module' });
+  assert.match(result.text, /preserve this, including punctuation/);
 });

@@ -1,4 +1,4 @@
-import { parse } from 'acorn';
+import { parse, type Token } from 'acorn';
 import { Stopped } from '../../orchestration/stopped.js';
 
 type Syntax = {
@@ -97,11 +97,13 @@ export function configureSvelte(
   base: string,
   replaceAdapter: boolean,
 ): { text: string; output: string; needsReplacement: boolean } {
+  const tokens: Token[] = [];
   let ast: Syntax;
   try {
     ast = parse(text, {
       ecmaVersion: 'latest',
       sourceType: 'module',
+      onToken: tokens,
     }) as unknown as Syntax;
   } catch {
     return conflict('Only parseable JavaScript Svelte configs are supported.');
@@ -110,6 +112,25 @@ export function configureSvelte(
   const exported = body.find((n) => n.type === 'ExportDefaultDeclaration');
   let declaration = node(exported?.declaration);
   if (declaration?.type === 'Identifier') {
+    const bindingName = declaration.name;
+    const references: Syntax[] = [];
+    function walk(value: unknown): void {
+      if (!value || typeof value !== 'object') return;
+      if (Array.isArray(value)) {
+        value.forEach(walk);
+        return;
+      }
+      const syntax = value as Syntax;
+      if (syntax.type === 'Identifier' && syntax.name === bindingName)
+        references.push(syntax);
+      for (const child of Object.values(syntax))
+        if (child && typeof child === 'object') walk(child);
+    }
+    walk(ast);
+    if (references.length !== 2)
+      conflict(
+        'The named config is referenced outside its declaration and export.',
+      );
     const declarations = body
       .filter((n) => n.type === 'VariableDeclaration')
       .flatMap((n) => n.declarations as Syntax[]);
@@ -131,12 +152,20 @@ export function configureSvelte(
     else {
       const properties = target.properties as Syntax[];
       const last = properties.at(-1);
-      // Insert before the last property's end instead of competing insertions at
-      // the closing brace. Multiple additions share one patch below.
+      // Coalesce additions at the closing brace. Syntax tokens distinguish an
+      // actual trailing comma from commas inside comments.
       const start = target.end - 1;
       const found = patches.find((p) => p.start === start && p.end === start);
       const separator =
-        last && !text.slice(last.end, start).includes(',') ? ',' : '';
+        last &&
+        !tokens.some(
+          (token) =>
+            token.start >= last.end &&
+            token.end <= start &&
+            token.type.label === ',',
+        )
+          ? ','
+          : '';
       if (found) found.text += `\n${key}: ${value},`;
       else
         patches.push({

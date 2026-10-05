@@ -15,10 +15,12 @@ import { runAdd } from '../src/orchestration/add.js';
 
 // Network installation is opt-in; ordinary unit tests remain offline.
 // Run: LE_PAGES_BUILD_TEST=1 pnpm test
-for (const [repository, siteUrl] of [
-  ['Ada/app', undefined],
-  ['Ada/ada.github.io', undefined],
-  ['Ada/app', 'https://example.com/'],
+for (const [repository, siteUrl, manager, mode] of [
+  ['Ada/app', undefined, 'npm'],
+  ['Ada/ada.github.io', undefined, 'npm'],
+  ['Ada/app', 'https://example.com/', 'npm'],
+  ['Ada/pnpm-app', undefined, 'pnpm'],
+  ['Ada/legacy-app', undefined, 'npm', 'legacy'],
 ] as const) {
   test(
     `real SvelteKit static build: ${siteUrl ?? repository}`,
@@ -38,11 +40,25 @@ for (const [repository, siteUrl] of [
         await readFile(join(app, 'package.json'), 'utf8'),
       );
       metadata.engines = { node: '24' };
+      if (manager === 'pnpm') metadata.packageManager = 'pnpm@12.3.4';
       await writeFile(
         join(app, 'package.json'),
         JSON.stringify(metadata, null, 2),
       );
-      const base = siteUrl || repository.endsWith('.github.io') ? '' : '/app';
+      if (mode === 'legacy') {
+        await writeFile(
+          join(app, 'vite.config.ts'),
+          `import { sveltekit } from '@sveltejs/kit/vite'; import { defineConfig } from 'vite'; export default defineConfig({ plugins: [sveltekit()] });`,
+        );
+        await writeFile(
+          join(app, 'svelte.config.js'),
+          `import adapter from '@sveltejs/adapter-auto'; import { vitePreprocess } from '@sveltejs/vite-plugin-svelte'; export default { preprocess: vitePreprocess(), kit: { adapter: adapter() } };`,
+        );
+      }
+      const base =
+        siteUrl || repository.endsWith('.github.io')
+          ? ''
+          : `/${repository.split('/')[1]}`;
       await writeFile(
         join(app, 'src/routes/+page.svelte'),
         `<a href="${base}/about/">About</a><img src="${base}/mark.svg" alt="mark" />`,
@@ -66,7 +82,7 @@ for (const [repository, siteUrl] of [
         repositoryRoot: app,
         repository,
         siteUrl,
-        packageManager: 'npm',
+        packageManager: manager,
         replaceAdapter: true,
       };
       const result = await runAdd(request);
@@ -78,7 +94,12 @@ for (const [repository, siteUrl] of [
         /About/,
       );
       assert.ok(await readFile(join(app, 'build/mark.svg'), 'utf8'));
-      assert.ok(await readFile(join(app, 'package-lock.json'), 'utf8'));
+      assert.ok(
+        await readFile(
+          join(app, manager === 'npm' ? 'package-lock.json' : 'pnpm-lock.yaml'),
+          'utf8',
+        ),
+      );
       const second = await runAdd({ ...request, install: false });
       assert.equal(second.status, 'no-op', second.message);
     },

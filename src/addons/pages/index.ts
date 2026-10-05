@@ -90,6 +90,7 @@ async function files(root: string): Promise<string[]> {
   return result;
 }
 export async function inspectRoutes(app: string): Promise<string[]> {
+  await safePath(app, join(app, 'src'));
   const sources = await files(join(app, 'src'));
   for (const path of sources) {
     if (!/\.(?:[cm]?[jt]s|svelte)$/.test(path)) continue;
@@ -104,6 +105,12 @@ export async function inspectRoutes(app: string): Promise<string[]> {
       /\b(?:request|url)\.(?:headers|json|formData|text|searchParams)\b/.test(
         text,
       ) ||
+      (/\+server\.[jt]s$/.test(path) &&
+        /export\s+(?:(?:const|let|var)|(?:async\s+)?function)\s+(?:POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\b/.test(
+          text,
+        )) ||
+      (/\.remote\.[jt]s$/.test(path) &&
+        /\b(?:query|command|form)\s*\(/.test(text)) ||
       /\$env\/dynamic\/private/.test(text)
     )
       stop(
@@ -111,7 +118,11 @@ export async function inspectRoutes(app: string): Promise<string[]> {
         `Request-time server behavior is unsupported: ${relative(app, path)}. Use fully prerendered routes without actions, request headers, cookies, or runtime secrets.`,
       );
   }
-  return sources.filter((path) => /\/\+page\.svelte$/.test(path));
+  return sources.filter(
+    (path) =>
+      contained(join(app, 'src/routes'), path) &&
+      /\/\+page\.svelte$/.test(path),
+  );
 }
 function exportOption(
   text: string,
@@ -438,6 +449,15 @@ export async function planPages(
     stop(
       'unsupported',
       'Declare an exact packageManager version or supply --package-manager-version.',
+    );
+  if (
+    request.packageManagerVersion &&
+    declared &&
+    declared.split('@')[1]?.split('+')[0] !== request.packageManagerVersion
+  )
+    stop(
+      'conflict',
+      'The requested package-manager version conflicts with packageManager. Reconcile project metadata first.',
     );
   const engines = manifest.engines as Record<string, unknown> | undefined;
   const nodeVersion = request.nodeVersion ?? engines?.node;
