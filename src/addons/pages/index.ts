@@ -13,8 +13,8 @@ import type { Interaction } from '../license/index.js';
 import { Stopped } from '../../orchestration/stopped.js';
 import { configureSvelte, configureVite, siteBase } from './config.js';
 
-export const pagesWorkflowRef =
-  'Leftium/le/.github/workflows/pages.yml@0637ad053ad33f8d997a20394dd1dc1afc33c985';
+import { pagesWorkflowRef } from './ref.js';
+export { pagesWorkflowRef } from './ref.js';
 const workflowPrefix = 'Leftium/le/.github/workflows/pages.yml@';
 export type PagesRequest = {
   cwd?: string;

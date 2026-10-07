@@ -1,6 +1,6 @@
 {
   "name": "leftium",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "A project convention CLI for creating projects and applying add-ons.",
   "repository": {
     "type": "git",
@@ -30,11 +30,11 @@
     "le": "dist/src/cli/index.js"
   },
   "scripts": {
-    "build": "rescript && tsc && cp -R src/addons/license/templates dist/src/addons/license/ && cp -R src/addons/gitattributes/templates dist/src/addons/gitattributes/",
+    "build": "rescript && tsc && cp -R src/addons/license/templates dist/src/addons/license/ && cp -R src/addons/gitattributes/templates dist/src/addons/gitattributes/ && node scripts/release.mjs stamp",
     "typecheck": "rescript && tsc --noEmit",
     "test": "pnpm build && node --test dist/tests/*.test.js",
-    "format": "prettier --write \"**/*.{ts,json,yml,yaml}\"",
-    "format:check": "prettier --check \"**/*.{ts,json,yml,yaml}\"",
+    "format": "prettier --write \"**/*.{ts,mjs,json,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,mjs,json,yml,yaml}\"",
     "prepack": "pnpm test",
     "dev:rescript": "rescript watch",
     "dev:typescript": "tsc --watch",

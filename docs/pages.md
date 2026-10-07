@@ -45,7 +45,11 @@ Script names reach the shell through quoted environment variables, rather than b
 
 ## Version updates
 
-Consumer references pin the shared workflow to a full Git commit SHA. The workflow revision is pushed before that SHA becomes the generator's default. GitHub can resolve that immutable revision without waiting for a mutable branch or tag to advance. These workflow pins have their own version contract; an npm package version does not select a workflow revision.
+Each published `leftium` package generates callers pinned to the full 40-character SHA of its own release commit. Source contains a placeholder; publish CI stamps the final `GITHUB_SHA` into compiled output after the version bump reaches `main`. Squash merges work normally because stamping happens after merge. The existing `v<package version>` GitHub release identifies that same commit.
+
+Changes to `.github/workflows/pages.yml` require a `package.json` version bump in the same accepted change. PR CI and publish validation enforce this coupling. Ordinary CLI releases also pin their own release commit, even when the workflow content is unchanged. Release builds reject missing, invalid, or mismatched SHAs. CI packs the package, verifies its default generated caller and explicit override, then publishes that verified tarball using npm trusted publishing. Retries skip an already published npm version and an existing GitHub release.
+
+Local builds stamp the current checkout HEAD for deterministic development and tests. Unpushed local commits cannot be resolved by GitHub; use an explicit published workflow SHA when testing a consumer deployment. Historical contract v1 is anchored by `pages-workflow-v1` at `0637ad053ad33f8d997a20394dd1dc1afc33c985`. Existing callers remain valid until explicitly updated; new releases need no Pages-specific tag.
 
 After reviewing a published workflow revision and its contract, update a caller with:
 
